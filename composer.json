@@ -1,0 +1,30 @@
+{
+    "name": "champs-libres/wopi-test-bundle",
+    "type": "symfony-bundle",
+    "description": "A bundle providing routes and glue code between Symfony and a WOPI connector.",
+    "keywords": [
+        "wopi",
+        "symfony-bundle"
+    ],
+    "homepage": "http://github.com/champs-libres/wopi-test-bundle",
+    "license": "MIT",
+    "require": {
+        "php": ">= 7.4",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "champs-libres/wopi-bundle": "dev-master",
+        "drupol/php-conventions": "^5.0",
+        "friends-of-phpspec/phpspec-code-coverage": "^6.1",
+        "nyholm/psr7": "^1.4",
+        "phpspec/phpspec": "^7.1",
+        "symfony/http-client": "^5.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "ChampsLibres\\WopiTestBundle\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
