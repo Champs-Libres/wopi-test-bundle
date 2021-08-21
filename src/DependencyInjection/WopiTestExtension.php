@@ -9,12 +9,14 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\DependencyInjection;
 
+use ChampsLibres\WopiTestBundle\Entity\Document;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 
-final class WopiTestExtension extends Extension
+final class WopiTestExtension extends Extension implements PrependExtensionInterface
 {
     /**
      * @phpstan-ignore-next-line
@@ -27,5 +29,24 @@ final class WopiTestExtension extends Extension
         );
 
         $loader->load('services.php');
+    }
+
+    public function prepend(ContainerBuilder $container): void
+    {
+        $doctrine = $container->getExtensionConfig('doctrine');
+
+        $doctrine[0]['orm']['mappings']['WopiTestBundle'] = [
+            'type' => 'annotation',
+            'dir' => __DIR__ . '/../Entity',
+            'prefix' => 'ChampsLibres\WopiTestBundle\Entity',
+            'alias' => 'WopiTestBundle',
+        ];
+
+        $container->prependExtensionConfig('doctrine', $doctrine[0]);
+
+        $simpleThingsEntityAudit = $container->getExtensionConfig('simple_things_entity_audit');
+        $simpleThingsEntityAudit[0]['audited_entities'][] = Document::class;
+
+        $container->prependExtensionConfig('simple_things_entity_audit', $simpleThingsEntityAudit[0]);
     }
 }

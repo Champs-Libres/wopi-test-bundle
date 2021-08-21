@@ -7,9 +7,6 @@
 
 declare(strict_types=1);
 
-use ChampsLibres\WopiTestBundle\Controller\Editor;
-use ChampsLibres\WopiTestBundle\Controller\Files;
-use ChampsLibres\WopiTestBundle\Controller\Hosting;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 
 /**
@@ -19,17 +16,5 @@ use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
  */
 return static function (RoutingConfigurator $routes) {
     $routes
-        ->add('capabilities', '/hosting/capabilities')
-        ->controller([Hosting::class, 'capabilities']);
-
-    $routes
-        ->add('editorGeneratorRandomFilename', '/editor')
-        ->controller([Editor::class, 'generateRandomFilename']);
-
-    $routes
-        ->add('editor', '/editor/{fileName}/{extension}')
-        ->defaults([
-            'extension' => 'odt',
-        ])
-        ->controller(Editor::class);
+        ->import(__DIR__ . '/../../../Controller/Admin', 'annotation');
 };

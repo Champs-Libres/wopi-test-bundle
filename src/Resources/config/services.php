@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
+use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
 use ChampsLibres\WopiLib\WopiInterface;
+use ChampsLibres\WopiTestBundle\Service\Configuration\ConfigurableWopiConfiguration;
 use ChampsLibres\WopiTestBundle\Service\Wopi;
 
 return static function (ContainerConfigurator $container) {
@@ -28,5 +30,17 @@ return static function (ContainerConfigurator $container) {
         ->tag('controller.service_arguments');
 
     $services
+        ->load('ChampsLibres\\WopiTestBundle\\Service\\', __DIR__ . '/../../Service');
+
+    $services
+        ->load('ChampsLibres\\WopiTestBundle\\Service\\Admin\\Field\\Configurator\\', __DIR__ . '/../../Service/Admin/Field/Configurator')
+        ->tag('ea.field_configurator');
+
+    $services
         ->alias(WopiInterface::class, Wopi::class);
+
+    $services
+        ->set(ConfigurableWopiConfiguration::class)
+        ->decorate(WopiConfigurationInterface::class)
+        ->arg('$properties', service('.inner'));
 };

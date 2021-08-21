@@ -1,0 +1,22 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{# @var entity \EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto #}
+{% extends ea.templatePath('layout') %}
+
+{% block page_actions %}
+    {% for action in entity.actions %}
+        {{ include(action.templatePath, { action: action }, with_context = false) }}
+    {% endfor %}
+{% endblock %}
+
+{% block content_title %}
+    {%- apply spaceless -%}
+        {% set custom_page_title = ea.crud.customPageTitle(pageName, entity ? entity.instance : null) %}
+        {{ custom_page_title is null
+            ? (ea.crud.defaultPageTitle|trans(ea.i18n.translationParameters, 'EasyAdminBundle'))|raw
+            : (custom_page_title|trans(ea.i18n.translationParameters))|raw }}
+    {%- endapply -%}
+{% endblock %}
+
+{% block main %}
+    {% include '@Wopi/Editor/embedded.html.twig' %}
+{% endblock %}

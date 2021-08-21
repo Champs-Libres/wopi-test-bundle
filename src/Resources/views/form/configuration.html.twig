@@ -1,0 +1,12 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% form_theme form '@EasyAdmin/symfony-form-themes/bootstrap_5_layout.html.twig' %}
+
+{% block content_title %}
+    Edit client configuration
+{% endblock %}
+
+{% block main %}
+    {{ form(form) }}
+{% endblock %}
