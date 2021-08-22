@@ -61,10 +61,15 @@ final class Wopi implements WopiInterface
         $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
 
         if ([] === $this->wopiDiscovery->discoverExtension($document->getExtension())) {
-            // TODO Exception.
+            return $this
+                ->psr17
+                ->createResponse(404);
         }
 
         $user = $this->security->getUser();
+
+        // TODO: Find first revision and get user/owner from it.
+        // $revisions = $this->auditReader->findRevisions(Document::class, $documentId);
 
         return $this
             ->psr17
@@ -73,16 +78,16 @@ final class Wopi implements WopiInterface
             ->withBody($this->psr17->createStream((string) json_encode(
                 [
                     'BaseFileName' => $document->getFilename(),
-                    'OwnerId' => uniqid(),
-                    'Size' => 0,
+                    'OwnerId' => 'Symfony',
+                    'Size' => $document->getSize(),
                     'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
-                    'Version' => 'v' . $documentRevision,
+                    'Version' => sprintf('v%s', $documentRevision),
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
                     'UserCanNotWriteRelative' => true,
                     'SupportsLocks' => true,
                     'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
-                    'LastModifiedTime' => date('Y-m-d\TH:i:s.u\Z', $revision->getTimestamp()->getTimestamp()),
+                    'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.u\Z'),
                     'CloseButtonClosesWindow' => false,
                     'EnableInsertRemoteImage' => true,
                     'EnableShare' => false,

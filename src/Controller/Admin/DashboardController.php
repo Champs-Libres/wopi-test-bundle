@@ -12,12 +12,13 @@ namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\DocumentRevision;
 use ChampsLibres\WopiTestBundle\Entity\Lock;
-use ChampsLibres\WopiTestBundle\Entity\Revision;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
+use EasyCorp\Bundle\EasyAdminBundle\Config\UserMenu;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 class DashboardController extends AbstractDashboardController
 {
@@ -46,6 +47,13 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToRoute('Configuration', 'fas fa-cogs', 'configuration');
 
         yield MenuItem::linkToRoute('Capabilities', 'fas fa-info', 'hosting_capabilities');
+    }
+
+    public function configureUserMenu(UserInterface $user): UserMenu
+    {
+        return parent::configureUserMenu($user)
+            ->displayUserName(true)
+            ->displayUserAvatar(true);
     }
 
     /**

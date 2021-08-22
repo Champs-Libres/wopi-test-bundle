@@ -14,7 +14,6 @@ use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
-use ChampsLibres\WopiTestBundle\Service\Controller\ResponderInterface;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -36,12 +35,10 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
-use EasyCorp\Bundle\EasyAdminBundle\Router\CrudUrlGenerator;
 use EasyCorp\Bundle\EasyAdminBundle\Security\Permission;
 use Exception;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
@@ -52,15 +49,9 @@ final class DocumentCrudController extends AbstractCrudController
 
     private AuditReader $auditReader;
 
-    private CrudUrlGenerator $crudUrlGenerator;
-
     private DocumentRepository $documentRepository;
 
     private Psr17Interface $psr17;
-
-    private RequestStack $requestStack;
-
-    private ResponderInterface $responder;
 
     private RouterInterface $router;
 
@@ -74,25 +65,19 @@ final class DocumentCrudController extends AbstractCrudController
         DocumentRepository $documentRepository,
         WopiConfigurationInterface $wopiConfiguration,
         WopiDiscoveryInterface $wopiDiscovery,
-        ResponderInterface $responder,
         RouterInterface $router,
         Psr17Interface $psr17,
         AuditReader $auditReader,
         Security $security,
-        RequestStack $requestStack,
-        CrudUrlGenerator $crudUrlGenerator,
         AdminUrlGenerator $adminUrlGenerator
     ) {
         $this->documentRepository = $documentRepository;
         $this->wopiConfiguration = $wopiConfiguration;
         $this->wopiDiscovery = $wopiDiscovery;
-        $this->responder = $responder;
         $this->router = $router;
         $this->psr17 = $psr17;
         $this->auditReader = $auditReader;
         $this->security = $security;
-        $this->requestStack = $requestStack;
-        $this->crudUrlGenerator = $crudUrlGenerator;
         $this->adminUrlGenerator = $adminUrlGenerator;
     }
 
@@ -138,6 +123,7 @@ final class DocumentCrudController extends AbstractCrudController
             ->onlyOnIndex();
 
         yield TextField::new('name')
+            ->setLabel('Filename')
             ->onlyWhenCreating();
 
         yield TextField::new('extension')
@@ -172,7 +158,7 @@ final class DocumentCrudController extends AbstractCrudController
         $extension = $document->getExtension();
         $configuration = $this->wopiConfiguration->jsonSerialize();
 
-        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension)) {
+        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension, 'edit')) {
             throw new Exception('Unsupported extension.');
         }
 

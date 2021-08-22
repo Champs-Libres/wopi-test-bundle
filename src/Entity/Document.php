@@ -48,7 +48,7 @@ class Document
     /**
      * @ORM\Column(name="size", type="bigint", options={"default": "0"}, nullable=true)
      */
-    private string $size;
+    private string $size = '0';
 
     public function getContent()
     {
