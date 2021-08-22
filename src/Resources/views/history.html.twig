@@ -30,15 +30,23 @@
             <th>ID</th>
             <th>User</th>
             <th>Date</th>
+            <th>Edit</th>
             </tr>
         </thead>
 
         <tbody>
         {% for revision in revisions %}
+            {% set editUrl = ea_url()
+                    .setController(ea.crud.controllerFqcn)
+                    .setAction('edit')
+                    .setEntityId(entity.primaryKeyValue)
+                    .set('revision', revision.rev)
+            %}
             <tr>
                 <td>{{ revision.rev }}</td>
                 <td>{{ revision.username|default('unknown_user'|trans({}, 'EasyAdminBundle')) }}</td>
                 <td><time datetime="{{ revision.timestamp|date('c') }}" title="{{ revision.timestamp|date('r') }}">{{ revision.timestamp|date('c') }}</time></td>
+                <td><a href="{{ editUrl }}">Edit this version</a></td>
             </tr>
         {% endfor %}
     </table>

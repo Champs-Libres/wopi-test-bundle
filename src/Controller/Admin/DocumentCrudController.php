@@ -36,6 +36,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use EasyCorp\Bundle\EasyAdminBundle\Router\CrudUrlGenerator;
 use EasyCorp\Bundle\EasyAdminBundle\Security\Permission;
 use Exception;
 use loophp\psr17\Psr17Interface;
@@ -47,7 +48,11 @@ use Symfony\Component\Security\Core\Security;
 
 final class DocumentCrudController extends AbstractCrudController
 {
+    private AdminUrlGenerator $adminUrlGenerator;
+
     private AuditReader $auditReader;
+
+    private CrudUrlGenerator $crudUrlGenerator;
 
     private DocumentRepository $documentRepository;
 
@@ -74,7 +79,9 @@ final class DocumentCrudController extends AbstractCrudController
         Psr17Interface $psr17,
         AuditReader $auditReader,
         Security $security,
-        RequestStack $requestStack
+        RequestStack $requestStack,
+        CrudUrlGenerator $crudUrlGenerator,
+        AdminUrlGenerator $adminUrlGenerator
     ) {
         $this->documentRepository = $documentRepository;
         $this->wopiConfiguration = $wopiConfiguration;
@@ -85,6 +92,8 @@ final class DocumentCrudController extends AbstractCrudController
         $this->auditReader = $auditReader;
         $this->security = $security;
         $this->requestStack = $requestStack;
+        $this->crudUrlGenerator = $crudUrlGenerator;
+        $this->adminUrlGenerator = $adminUrlGenerator;
     }
 
     public function configureActions(Actions $actions): Actions
@@ -103,7 +112,6 @@ final class DocumentCrudController extends AbstractCrudController
                     ->addCssClass('btn btn-primary')
                     ->setIcon('fa fa-unlock')
             )
-            ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->add(Crud::PAGE_INDEX, Action::DETAIL)
             ->add(
                 Crud::PAGE_INDEX,
@@ -113,24 +121,31 @@ final class DocumentCrudController extends AbstractCrudController
                 Crud::PAGE_INDEX,
                 $showHistory
             )
+            ->add(Crud::PAGE_EDIT, Action::INDEX)
             ->update(Crud::PAGE_INDEX, Action::EDIT, static fn (Action $action) => $action->displayIf(static fn (Document $document): bool => null === $document->getLock()))
+            ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
-            ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN)
-            ->add(Crud::PAGE_EDIT, Action::INDEX);
+            ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
     }
 
     public function configureFields(string $pageName): iterable
     {
-        yield IdField::new('id')->hideWhenCreating()->hideWhenUpdating();
+        yield IdField::new('id')
+            ->hideWhenCreating()
+            ->hideWhenUpdating();
 
         yield TextField::new('filename')
             ->onlyOnIndex();
 
-        yield TextField::new('name');
+        yield TextField::new('name')
+            ->onlyWhenCreating();
 
-        yield TextField::new('extension');
+        yield TextField::new('extension')
+            ->onlyWhenCreating();
 
-        yield IntegerField::new('size')->hideWhenCreating()->hideWhenUpdating();
+        yield IntegerField::new('size')
+            ->hideWhenCreating()
+            ->hideWhenUpdating();
 
         yield WopiDocumentRevisionField::new('id');
 
@@ -144,10 +159,15 @@ final class DocumentCrudController extends AbstractCrudController
 
     public function edit(AdminContext $context)
     {
-        $entity = $context->getEntity()->getInstance();
-        $fileId = $entity->getId();
+        $documentId = $context->getEntity()->getInstance()->getId();
+        $documentRevision = $context->getRequest()->query->get('revision');
 
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        if (null === $documentRevision) {
+            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        /** @var Document $document */
+        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
 
         $extension = $document->getExtension();
         $configuration = $this->wopiConfiguration->jsonSerialize();
@@ -168,7 +188,7 @@ final class DocumentCrudController extends AbstractCrudController
                             ->generate(
                                 'checkFileInfo',
                                 [
-                                    'fileId' => $document->getId(),
+                                    'fileId' => sprintf('%s-%s', $document->getId(), $documentRevision),
                                 ],
                                 UrlGeneratorInterface::ABSOLUTE_URL
                             ),                    ]
@@ -229,8 +249,14 @@ final class DocumentCrudController extends AbstractCrudController
 
         $entity = $context->getEntity();
         $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
-//        $entities = $this->get(EntityFactory::class)->createCollection($context->getEntity(), $paginator->getResults());
-//        $this->get(EntityFactory::class)->processFieldsForAll($entities, $fields);
+
+        foreach ($entities as $key => $revision) {
+            $entities[$key]->edit = $this
+                ->adminUrlGenerator
+                ->setController(DocumentCrudController::class)
+                ->setAction(Crud::PAGE_EDIT)
+                ->set('fileId', sprintf('%s-%s', $entity->getInstance()->getId(), $revision->getRev()));
+        }
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
             'revisions' => $entities,

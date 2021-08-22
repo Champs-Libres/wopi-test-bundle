@@ -51,8 +51,14 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
-        $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(Document::class, $fileId));
+        [$documentId, $documentRevision] = explode('-', $fileId, 2);
+
+        if (null === $documentRevision) {
+            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(Document::class, $documentId));
+        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
 
         if ([] === $this->wopiDiscovery->discoverExtension($document->getExtension())) {
             // TODO Exception.
@@ -70,7 +76,7 @@ final class Wopi implements WopiInterface
                     'OwnerId' => uniqid(),
                     'Size' => 0,
                     'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
-                    'Version' => 'v' . $revision->getRev(),
+                    'Version' => 'v' . $documentRevision,
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
                     'UserCanNotWriteRelative' => true,
@@ -105,7 +111,13 @@ final class Wopi implements WopiInterface
 
     public function getFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        [$documentId, $documentRevision] = explode('-', $fileId);
+
+        if (null === $documentRevision) {
+            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
 
         $content = (null === $contentResource = $document->getContent()) ?
             $this->psr17->createStream('') :
