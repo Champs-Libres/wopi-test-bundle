@@ -13,40 +13,57 @@ use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
+use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
 use ChampsLibres\WopiTestBundle\Service\Controller\ResponderInterface;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
+use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
+use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Option\EA;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\BatchActionDto;
+use EasyCorp\Bundle\EasyAdminBundle\Event\AfterCrudActionEvent;
+use EasyCorp\Bundle\EasyAdminBundle\Event\BeforeCrudActionEvent;
+use EasyCorp\Bundle\EasyAdminBundle\Exception\ForbiddenActionException;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\EntityFactory;
-use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
+use EasyCorp\Bundle\EasyAdminBundle\Factory\FilterFactory;
+use EasyCorp\Bundle\EasyAdminBundle\Factory\PaginatorFactory;
+use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
+use EasyCorp\Bundle\EasyAdminBundle\Security\Permission;
 use Exception;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Security;
 
 final class DocumentCrudController extends AbstractCrudController
 {
+    private AuditReader $auditReader;
+
     private DocumentRepository $documentRepository;
 
     private Psr17Interface $psr17;
+
+    private RequestStack $requestStack;
 
     private ResponderInterface $responder;
 
     private RouterInterface $router;
 
+    private Security $security;
+
     private WopiConfigurationInterface $wopiConfiguration;
 
     private WopiDiscoveryInterface $wopiDiscovery;
-
-    private AuditReader $auditReader;
 
     public function __construct(
         DocumentRepository $documentRepository,
@@ -55,7 +72,9 @@ final class DocumentCrudController extends AbstractCrudController
         ResponderInterface $responder,
         RouterInterface $router,
         Psr17Interface $psr17,
-        AuditReader $auditReader
+        AuditReader $auditReader,
+        Security $security,
+        RequestStack $requestStack
     ) {
         $this->documentRepository = $documentRepository;
         $this->wopiConfiguration = $wopiConfiguration;
@@ -64,15 +83,17 @@ final class DocumentCrudController extends AbstractCrudController
         $this->router = $router;
         $this->psr17 = $psr17;
         $this->auditReader = $auditReader;
+        $this->security = $security;
+        $this->requestStack = $requestStack;
     }
 
     public function configureActions(Actions $actions): Actions
     {
-        $unlockDocument = Action::new('unlock', 'Unlock', 'fa fa-unlock')
+        $unlockDocument = Action::new('unlock', 'Unlock')
             ->linkToCrudAction('unlockDocument')
             ->displayIf(static fn (Document $document): bool => null !== $document->getLock());
 
-        $showHistory = Action::new('history', 'History', 'fa fa-clock')
+        $showHistory = Action::new('history', 'History')
             ->linkToCrudAction('showHistory');
 
         return $actions
@@ -82,6 +103,7 @@ final class DocumentCrudController extends AbstractCrudController
                     ->addCssClass('btn btn-primary')
                     ->setIcon('fa fa-unlock')
             )
+            ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->add(Crud::PAGE_INDEX, Action::DETAIL)
             ->add(
                 Crud::PAGE_INDEX,
@@ -101,20 +123,23 @@ final class DocumentCrudController extends AbstractCrudController
     {
         yield IdField::new('id')->hideWhenCreating()->hideWhenUpdating();
 
+        yield TextField::new('filename')
+            ->onlyOnIndex();
+
         yield TextField::new('name');
 
         yield TextField::new('extension');
 
         yield IntegerField::new('size')->hideWhenCreating()->hideWhenUpdating();
 
-        yield DateTimeField::new('lastModified', 'Last modified')->hideWhenCreating()->hideWhenUpdating();
+        yield WopiDocumentRevisionField::new('id');
 
-        yield TextField::new('lock')
+        yield WopiDocumentRevisionTimestampField::new('id');
+
+        yield AssociationField::new('lock')
             ->hideWhenCreating()
             ->hideWhenUpdating()
             ->setTemplatePath('@WopiTest/fields/lock.html.twig');
-
-        yield WopiDocumentRevisionField::new('id');
     }
 
     public function edit(AdminContext $context)
@@ -131,6 +156,7 @@ final class DocumentCrudController extends AbstractCrudController
             throw new Exception('Unsupported extension.');
         }
 
+        $configuration['access_token'] = $this->security->getUser()->getUserIdentifier();
         $configuration['server'] = $this
             ->psr17
             ->createUri($discoverExtension[0]['urlsrc'])
@@ -145,32 +171,86 @@ final class DocumentCrudController extends AbstractCrudController
                                     'fileId' => $document->getId(),
                                 ],
                                 UrlGeneratorInterface::ABSOLUTE_URL
-                            )                    ]
+                            ),                    ]
                 )
             );
 
         $this->get(EntityFactory::class)->processActions($context->getEntity(), $context->getCrud()->getActionsConfig());
 
-        $variables = array_merge(
+        $responseParameters = $this->configureResponseParameters(KeyValueStore::new(array_merge(
             $configuration,
             [
                 'pageName' => Crud::PAGE_EDIT,
-                'templateName' => 'crud/edit',
+                'templatePath' => '@WopiTest/Editor.html.twig',
                 'entity' => $context->getEntity(),
             ]
-        );
+        )));
 
-        return $this
-            ->responder
-            ->render(
-                '@WopiTest/Editor.html.twig',
-                $variables
-            );
+        $event = new AfterCrudActionEvent($context, $responseParameters);
+        $this->get('event_dispatcher')->dispatch($event);
+
+        if ($event->isPropagationStopped()) {
+            return $event->getResponse();
+        }
+
+        return $responseParameters;
     }
 
     public static function getEntityFqcn(): string
     {
         return Document::class;
+    }
+
+    public function showHistory(AdminContext $context)
+    {
+        $event = new BeforeCrudActionEvent($context);
+        $this->get('event_dispatcher')->dispatch($event);
+
+        if ($event->isPropagationStopped()) {
+            return $event->getResponse();
+        }
+
+        if (!$this->isGranted(Permission::EA_EXECUTE_ACTION, ['action' => Action::INDEX, 'entity' => null])) {
+            throw new ForbiddenActionException($context);
+        }
+
+        $fields = FieldCollection::new($this->configureFields(Crud::PAGE_INDEX));
+        $filters = $this->get(FilterFactory::class)->create($context->getCrud()->getFiltersConfig(), $fields, $context->getEntity());
+        $queryBuilder = $this->createIndexQueryBuilder($context->getSearch(), $context->getEntity(), $fields, $filters);
+        $paginator = $this->get(PaginatorFactory::class)->create($queryBuilder);
+
+        // this can happen after deleting some items and trying to return
+        // to a 'index' page that no longer exists. Redirect to the last page instead
+        if ($paginator->isOutOfRange()) {
+            return $this->redirect($this->get(AdminUrlGenerator::class)
+                ->set(EA::PAGE, $paginator->getLastPage())
+                ->generateUrl());
+        }
+
+        $entity = $context->getEntity();
+        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
+//        $entities = $this->get(EntityFactory::class)->createCollection($context->getEntity(), $paginator->getResults());
+//        $this->get(EntityFactory::class)->processFieldsForAll($entities, $fields);
+
+        $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
+            'revisions' => $entities,
+            'entity' => $entity,
+            'batch_actions' => [],
+            'filters' => [],
+            'global_actions' => [],
+            'paginator' => $paginator,
+            'pageName' => Crud::PAGE_DETAIL,
+            'templatePath' => '@WopiTest/history.html.twig',
+        ]));
+
+        $event = new AfterCrudActionEvent($context, $responseParameters);
+        $this->get('event_dispatcher')->dispatch($event);
+
+        if ($event->isPropagationStopped()) {
+            return $event->getResponse();
+        }
+
+        return $responseParameters;
     }
 
     public function unlockDocument(AdminContext $context)
@@ -194,10 +274,5 @@ final class DocumentCrudController extends AbstractCrudController
         $entityManager->flush();
 
         return $this->redirect($batchActionDto->getReferrerUrl());
-    }
-
-    public function showHistory(AdminContext $context): Response
-    {
-
     }
 }

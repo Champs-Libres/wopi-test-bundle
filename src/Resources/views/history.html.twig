@@ -1,0 +1,61 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{# @var entities \EasyCorp\Bundle\EasyAdminBundle\Collection\EntityDtoCollection #}
+{# @var paginator \EasyCorp\Bundle\EasyAdminBundle\Orm\EntityPaginator #}
+{% extends ea.templatePath('layout') %}
+{% trans_default_domain ea.i18n.translationDomain %}
+
+{% block content_title %}
+    {%- apply spaceless -%}
+        Document revisions
+        {% set custom_page_title = ea.crud.customPageTitle(pageName, entity ? entity.instance : null) %}
+        {{ custom_page_title is null
+            ? (ea.crud.defaultPageTitle|trans(ea.i18n.translationParameters, 'EasyAdminBundle'))|raw
+            : (custom_page_title|trans(ea.i18n.translationParameters))|raw }}
+    {%- endapply -%}
+{% endblock %}
+
+{% block main %}
+    {# sort can be multiple; let's consider the sorting field the first one #}
+    {% set sort_field_name = app.request.get('sort')|keys|first %}
+    {% set sort_order = app.request.get('sort')|first %}
+    {% set some_results_are_hidden = false %}
+    {% set has_footer = revisions|length != 0 %}
+    {% set has_search = ea.crud.isSearchEnabled %}
+    {% set has_filters = filters|length > 0 %}
+    {% set num_results = revisions|length %}
+
+    <table class="table datagrid {{ revisions is empty ? 'datagrid-empty' }}">
+        <thead>
+            <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Date</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for revision in revisions %}
+            <tr>
+                <td>{{ revision.rev }}</td>
+                <td>{{ revision.username|default('unknown_user'|trans({}, 'EasyAdminBundle')) }}</td>
+                <td><time datetime="{{ revision.timestamp|date('c') }}" title="{{ revision.timestamp|date('r') }}">{{ revision.timestamp|date('c') }}</time></td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    {% if revisions|length > 0 %}
+        <div class="content-panel-footer without-padding without-border">
+            {% block paginator %}
+                {{ include(ea.templatePath('crud/paginator')) }}
+            {% endblock paginator %}
+        </div>
+    {% endif %}
+
+    {% block delete_form %}
+        {{ include('@EasyAdmin/crud/includes/_delete_form.html.twig', with_context = false) }}
+    {% endblock delete_form %}
+
+    {% if has_filters %}
+        {{ include('@EasyAdmin/crud/includes/_filters_modal.html.twig') }}
+    {% endif %}
+{% endblock main %}

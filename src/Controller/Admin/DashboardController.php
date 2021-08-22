@@ -11,6 +11,7 @@ namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\DocumentRevision;
+use ChampsLibres\WopiTestBundle\Entity\Lock;
 use ChampsLibres\WopiTestBundle\Entity\Revision;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
@@ -24,7 +25,8 @@ class DashboardController extends AbstractDashboardController
     {
         return Dashboard::new()
             ->setTitle('WOPI Bundle admin')
-            ->renderContentMaximized();
+            ->renderContentMaximized()
+            ->renderSidebarMinimized(true);
     }
 
     public function configureMenuItems(): iterable
@@ -34,6 +36,8 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::section('WOPI Host');
 
         yield MenuItem::linkToCrud('Documents', 'fas fa-list', Document::class);
+
+        yield MenuItem::linkToCrud('Locks', 'fas fa-list', Lock::class);
 //        yield MenuItem::linkToCrud('Documents revisions', 'fas fa-list', DocumentRevision::class);
 //        yield MenuItem::linkToCrud('Revisions', 'fas fa-list', Revision::class);
 
@@ -45,7 +49,7 @@ class DashboardController extends AbstractDashboardController
     }
 
     /**
-     * @Route("/admin", name="admin")
+     * @Route("/admin/wopi", name="admin_wopi")
      */
     public function index(): Response
     {

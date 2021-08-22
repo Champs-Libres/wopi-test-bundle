@@ -45,7 +45,9 @@ final class WopiTestExtension extends Extension implements PrependExtensionInter
         $container->prependExtensionConfig('doctrine', $doctrine[0]);
 
         $simpleThingsEntityAudit = $container->getExtensionConfig('simple_things_entity_audit');
+
         $simpleThingsEntityAudit[0]['audited_entities'][] = Document::class;
+        $simpleThingsEntityAudit[0]['global_ignore_columns'][] = 'lock';
 
         $container->prependExtensionConfig('simple_things_entity_audit', $simpleThingsEntityAudit[0]);
     }

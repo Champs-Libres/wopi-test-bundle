@@ -9,9 +9,6 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Entity;
 
-use DateTimeInterface;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -38,9 +35,10 @@ class Document
     private int $id;
 
     /**
-     * @ORM\Column(name="lock", type="string", length=255, nullable=true)
+     * @ORM\OneToOne(targetEntity="Lock", inversedBy="document", cascade={"persist", "remove"}, orphanRemoval=true)
+     * @ORM\JoinColumn(name="document_id", referencedColumnName="id", onDelete="CASCADE")
      */
-    private ?string $lock;
+    private ?Lock $lock;
 
     /**
      * @ORM\Column(name="name", type="string", length=255, nullable=false)
@@ -50,24 +48,7 @@ class Document
     /**
      * @ORM\Column(name="size", type="bigint", options={"default": "0"}, nullable=true)
      */
-    private int $size;
-
-    /**
-     * @ORM\OneToMany(targetEntity="DocumentRevision", mappedBy="document")
-     */
-    private Collection $documentRevisions;
-
-    public function getLastModified(): DateTimeInterface
-    {
-        $revision = $this->documentRevisions->last();
-
-        return $revision->getTimestamp();
-    }
-
-    public function __construct()
-    {
-        $this->documentRevisions = new ArrayCollection();
-    }
+    private string $size;
 
     public function getContent()
     {
@@ -89,7 +70,7 @@ class Document
         return $this->id;
     }
 
-    public function getLock(): ?string
+    public function getLock(): ?Lock
     {
         return $this->lock;
     }
@@ -99,7 +80,7 @@ class Document
         return $this->name;
     }
 
-    public function getSize(): int
+    public function getSize(): string
     {
         return $this->size;
     }
@@ -118,7 +99,7 @@ class Document
         return $this;
     }
 
-    public function setLock(?string $lock): self
+    public function setLock(?Lock $lock): self
     {
         $this->lock = $lock;
 
@@ -132,7 +113,7 @@ class Document
         return $this;
     }
 
-    public function setSize(int $size): self
+    public function setSize(string $size): self
     {
         $this->size = $size;
 

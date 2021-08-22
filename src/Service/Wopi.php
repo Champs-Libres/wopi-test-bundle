@@ -12,11 +12,13 @@ namespace ChampsLibres\WopiTestBundle\Service;
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
 use ChampsLibres\WopiLib\WopiInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
+use ChampsLibres\WopiTestBundle\Entity\Lock;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use SimpleThings\EntityAudit\AuditReader;
+use Symfony\Component\Security\Core\Security;
 
 final class Wopi implements WopiInterface
 {
@@ -26,18 +28,22 @@ final class Wopi implements WopiInterface
 
     private Psr17Interface $psr17;
 
+    private Security $security;
+
     private WopiDiscoveryInterface $wopiDiscovery;
 
     public function __construct(
         Psr17Interface $psr17,
         WopiDiscoveryInterface $wopiDiscovery,
         DocumentRepository $documentRepository,
-        AuditReader $auditReader
+        AuditReader $auditReader,
+        Security $security
     ) {
         $this->psr17 = $psr17;
         $this->wopiDiscovery = $wopiDiscovery;
         $this->documentRepository = $documentRepository;
         $this->auditReader = $auditReader;
+        $this->security = $security;
     }
 
     public function checkFileInfo(
@@ -52,6 +58,8 @@ final class Wopi implements WopiInterface
             // TODO Exception.
         }
 
+        $user = $this->security->getUser();
+
         return $this
             ->psr17
             ->createResponse()
@@ -61,14 +69,13 @@ final class Wopi implements WopiInterface
                     'BaseFileName' => $document->getFilename(),
                     'OwnerId' => uniqid(),
                     'Size' => 0,
-                    'UserId' => uniqid(),
+                    'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
                     'Version' => 'v' . $revision->getRev(),
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
                     'UserCanNotWriteRelative' => true,
                     'SupportsLocks' => true,
-                    'UserFriendlyName' => 'User Name ' . uniqid(),
-                    'UserExtraInfo' => [],
+                    'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
                     'LastModifiedTime' => date('Y-m-d\TH:i:s.u\Z', $revision->getTimestamp()->getTimestamp()),
                     'CloseButtonClosesWindow' => false,
                     'EnableInsertRemoteImage' => true,
@@ -78,6 +85,7 @@ final class Wopi implements WopiInterface
                     'DisablePrint' => false,
                     'DisableExport' => false,
                     'DisableCopy' => false,
+                    'AllowExternalMarketplace' => true,
                 ]
             )));
     }
@@ -120,11 +128,18 @@ final class Wopi implements WopiInterface
     public function getLock(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
         $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        $lock = $document->getLock();
+
+        if (false === $lock->isValid()) {
+            return $this
+                ->psr17
+                ->createResponse(404);
+        }
 
         return $this
             ->psr17
             ->createResponse()
-            ->withHeader('X-WOPI-Lock', $document->getLock());
+            ->withHeader('X-WOPI-Lock', $lock->getLock());
     }
 
     public function getShareUrl(
@@ -150,22 +165,41 @@ final class Wopi implements WopiInterface
         RequestInterface $request
     ): ResponseInterface {
         $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        $lock = $document->getLock();
 
-        if (null !== $currentLock = $document->getLock()) {
-            if ($currentLock !== $xWopiLock) {
-                $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(Document::class, $fileId));
+        if ((null !== $lock) && (false === $lock->isValid())) {
+            $document->setLock(null);
+            $this->documentRepository->add($document);
 
-                return $this
-                    ->psr17
-                    ->createResponse(409)
-                    ->withAddedHeader('X-WOPI-Lock', $currentLock)
-                    ->withAddedHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
-            }
+            $lock = $document->getLock();
         }
 
-        $document->setLock($xWopiLock);
+        if (null === $lock) {
+            $document->setLock((new Lock())->setLock($xWopiLock));
 
-        $this->documentRepository->add($document);
+            $this->documentRepository->add($document);
+
+            return $this
+                ->psr17
+                ->createResponse()
+                ->withHeader('Content-Type', 'application/json');
+        }
+
+        if ($lock->getLock() === $xWopiLock) {
+            return $this->refreshLock($fileId, $accessToken, $xWopiLock, $request);
+        }
+
+        if ($lock->getLock() !== $xWopiLock) {
+            $revision = $this
+                ->auditReader
+                ->findRevision($this->auditReader->getCurrentRevision(Document::class, $fileId));
+
+            return $this
+                ->psr17
+                ->createResponse(409)
+                ->withAddedHeader('X-WOPI-Lock', $lock->getLock())
+                ->withAddedHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
+        }
 
         return $this
             ->psr17
@@ -183,8 +217,11 @@ final class Wopi implements WopiInterface
         $document = $this->documentRepository->findOneBy(['id' => $fileId]);
 
         $document->setContent((string) $request->getBody());
-        $document->setLock($xWopiLock);
-        $document->setSize((int) $request->getHeaderLine('content-length'));
+        $document->setLock(
+            (new Lock())
+                ->setLock($xWopiLock)
+        );
+        $document->setSize($request->getHeaderLine('content-length'));
 
         $this->documentRepository->add($document);
 
@@ -205,7 +242,7 @@ final class Wopi implements WopiInterface
         $new->setName($pathInfo['filename']);
         $new->setExtension($pathInfo['extension']);
         $new->setContent((string) $request->getBody());
-        $new->setSize((int) $request->getHeaderLine('content-length'));
+        $new->setSize($request->getHeaderLine('content-length'));
 
         $this->documentRepository->add($new);
 
@@ -226,7 +263,9 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $this->unlock($fileId, $accessToken, $xWopiLock, $request);
+
+        return $this->lock($fileId, $accessToken, $xWopiLock, $request);
     }
 
     public function renameFile(
@@ -264,7 +303,9 @@ final class Wopi implements WopiInterface
         string $xWopiOldLock,
         RequestInterface $request
     ): ResponseInterface {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $this->unlock($fileId, $accessToken, $xWopiLock, $request);
+
+        return $this->lock($fileId, $accessToken, $xWopiLock, $request);
     }
 
     private function getDebugResponse(string $method, RequestInterface $request): ResponseInterface

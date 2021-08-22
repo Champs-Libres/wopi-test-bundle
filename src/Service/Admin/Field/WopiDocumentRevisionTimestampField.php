@@ -12,7 +12,7 @@ namespace ChampsLibres\WopiTestBundle\Service\Admin\Field;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FieldTrait;
 
-final class WopiDocumentRevisionField implements FieldInterface
+final class WopiDocumentRevisionTimestampField implements FieldInterface
 {
     use FieldTrait;
 
@@ -23,7 +23,7 @@ final class WopiDocumentRevisionField implements FieldInterface
     {
         return (new self())
             ->setProperty($propertyName)
-            ->setLabel('Version')
+            ->setLabel('Last modified')
             ->hideWhenCreating()
             ->hideWhenUpdating();
     }
