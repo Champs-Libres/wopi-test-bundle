@@ -10,6 +10,9 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiTestBundle\Entity\Lock;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
@@ -18,6 +21,12 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 
 final class LockCrudController extends AbstractCrudController
 {
+    public function configureActions(Actions $actions): Actions
+    {
+        return $actions
+            ->remove(Crud::PAGE_INDEX, Action::NEW);
+    }
+
     public function configureFields(string $pageName): iterable
     {
         yield IdField::new('id')->hideWhenCreating()->hideWhenUpdating();

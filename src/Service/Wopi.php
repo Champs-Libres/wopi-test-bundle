@@ -87,7 +87,7 @@ final class Wopi implements WopiInterface
                     'UserCanNotWriteRelative' => true,
                     'SupportsLocks' => true,
                     'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
-                    'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.u\Z'),
+                    'LastModifiedTime' => $revision->getTimestamp()->format('c'),
                     'CloseButtonClosesWindow' => false,
                     'EnableInsertRemoteImage' => true,
                     'EnableShare' => false,

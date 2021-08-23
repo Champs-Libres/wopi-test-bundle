@@ -187,7 +187,7 @@ final class DocumentCrudController extends AbstractCrudController
             $configuration,
             [
                 'pageName' => Crud::PAGE_EDIT,
-                'templatePath' => '@WopiTest/Editor.html.twig',
+                'templatePath' => '@WopiTest/editor.html.twig',
                 'entity' => $context->getEntity(),
             ]
         )));
