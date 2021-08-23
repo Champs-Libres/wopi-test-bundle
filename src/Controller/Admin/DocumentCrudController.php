@@ -123,11 +123,9 @@ final class DocumentCrudController extends AbstractCrudController
             ->onlyOnIndex();
 
         yield TextField::new('name')
-            ->setLabel('Filename')
-            ->onlyWhenCreating();
+            ->setLabel('Filename');
 
-        yield TextField::new('extension')
-            ->onlyWhenCreating();
+        yield TextField::new('extension');
 
         yield IntegerField::new('size')
             ->hideWhenCreating()

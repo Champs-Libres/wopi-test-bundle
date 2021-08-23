@@ -79,23 +79,20 @@ final class Wopi implements WopiInterface
                 [
                     'BaseFileName' => $document->getFilename(),
                     'OwnerId' => 'Symfony',
-                    'Size' => $document->getSize(),
+                    'Size' => (int) $document->getSize(),
                     'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
                     'Version' => sprintf('v%s', $documentRevision),
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
-                    'UserCanNotWriteRelative' => true,
+                    'UserCanNotWriteRelative' => false,
                     'SupportsLocks' => true,
+                    'SupportsGetLock' => true,
+                    'SupportsExtendedLockLength' => true,
                     'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
                     'LastModifiedTime' => $revision->getTimestamp()->format('c'),
-                    'CloseButtonClosesWindow' => false,
-                    'EnableInsertRemoteImage' => true,
-                    'EnableShare' => false,
                     'SupportsUpdate' => true,
                     'SupportsRename' => false,
                     'DisablePrint' => false,
-                    'DisableExport' => false,
-                    'DisableCopy' => false,
                     'AllowExternalMarketplace' => true,
                 ]
             )));
@@ -116,19 +113,19 @@ final class Wopi implements WopiInterface
 
     public function getFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        [$documentId, $documentRevision] = explode('-', $fileId);
+        [$documentId, $documentRevisionId] = explode('-', $fileId);
 
-        if (null === $documentRevision) {
-            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        if (null === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
         }
 
-        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
+        $document = $this->documentRepository->find($documentId);
 
         $content = (null === $contentResource = $document->getContent()) ?
             $this->psr17->createStream('') :
             $this->psr17->createStreamFromResource($contentResource);
 
-        return $this
+        $response = $this
             ->psr17
             ->createResponse()
             ->withHeader(
@@ -136,16 +133,29 @@ final class Wopi implements WopiInterface
                 'application/octet-stream',
             )
             ->withHeader(
+                'Content-Length',
+                $document->getSize()
+            )
+            ->withHeader(
                 'Content-Disposition',
-                sprintf('attachment; filename=%s', $document->getName())
+                sprintf('attachment; filename=%s', $document->getFilename())
             )
             ->withBody($content);
+
+        return $response;
     }
 
     public function getLock(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
         $document = $this->documentRepository->findOneBy(['id' => $fileId]);
         $lock = $document->getLock();
+
+        if (null === $lock) {
+            return $this
+                ->psr17
+                ->createResponse(404)
+                ->withHeader('X-WOPI-Lock', '');
+        }
 
         if (false === $lock->isValid()) {
             return $this
@@ -181,7 +191,13 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        [$documentId, $documentRevisionId] = explode('-', $fileId);
+
+        if (null === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        $document = $this->documentRepository->find($documentId);
         $lock = $document->getLock();
 
         if ((null !== $lock) && (false === $lock->isValid())) {
@@ -198,8 +214,7 @@ final class Wopi implements WopiInterface
 
             return $this
                 ->psr17
-                ->createResponse()
-                ->withHeader('Content-Type', 'application/json');
+                ->createResponse();
         }
 
         if ($lock->getLock() === $xWopiLock) {
@@ -209,7 +224,7 @@ final class Wopi implements WopiInterface
         if ($lock->getLock() !== $xWopiLock) {
             $revision = $this
                 ->auditReader
-                ->findRevision($this->auditReader->getCurrentRevision(Document::class, $fileId));
+                ->findRevision($this->auditReader->getCurrentRevision(Document::class, $documentId));
 
             return $this
                 ->psr17
@@ -220,8 +235,7 @@ final class Wopi implements WopiInterface
 
         return $this
             ->psr17
-            ->createResponse()
-            ->withHeader('Content-Type', 'application/json');
+            ->createResponse();
     }
 
     public function putFile(
@@ -231,23 +245,55 @@ final class Wopi implements WopiInterface
         string $xWopiEditors,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        [$documentId, $documentRevisionId] = explode('-', $fileId);
 
-        $document->setContent((string) $request->getBody());
-        $document->setLock(
-            (new Lock())
-                ->setLock($xWopiLock)
-        );
-        $document->setSize($request->getHeaderLine('content-length'));
+        if (null === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        $document = $this->documentRepository->find($documentId);
+        $currentLock = $document->getLock();
+
+        // File is unlocked
+        if (null === $currentLock) {
+            if ('0' !== $document->getSize()) {
+                return $this
+                    ->psr17
+                    ->createResponse(409);
+            }
+        }
+
+        // File is locked
+        if (null !== $currentLock) {
+            if ($currentLock->getLock() !== $xWopiLock) {
+                return $this
+                    ->psr17
+                    ->createResponse(409)
+                    ->withAddedHeader('X-WOPI-Lock', $currentLock->getLock());
+            }
+        }
+
+        // File is unlocked.
+        /*
+        if (0 !== $document->getSize()) {
+            return $this
+                ->psr17
+                ->createResponse(409);
+        }
+        */
+
+        $body = (string) $request->getBody();
+
+        $document->setContent($body);
+        $document->setLock((new Lock())->setLock($xWopiLock));
+        $document->setSize((string) strlen($body));
 
         $this->documentRepository->add($document);
 
         return $this
             ->psr17
             ->createResponse()
-            ->withHeader('Content-Type', 'application/json')
-            ->withAddedHeader('X-WOPI-Lock', $xWopiLock)
-            ->withBody($this->psr17->createStream((string) json_encode([])));
+            ->withAddedHeader('X-WOPI-Lock', $xWopiLock);
     }
 
     public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
@@ -301,7 +347,30 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
+        [$documentId, $documentRevisionId] = explode('-', $fileId);
+
+        if (null === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        $document = $this->documentRepository->find($documentId);
+        $currentLock = $document->getLock();
+
+        if (null === $currentLock) {
+            return $this
+                ->psr17
+                ->createResponse(409)
+                ->withAddedHeader('X-WOPI-Lock', '');
+            }
+
+        if (null !== $currentLock) {
+            if ($xWopiLock !== $currentLock->getLock()) {
+                return $this
+                    ->psr17
+                    ->createResponse(409)
+                    ->withAddedHeader('X-WOPI-Lock', $currentLock->getLock());
+            }
+        }
 
         $document->setLock(null);
 
@@ -320,7 +389,11 @@ final class Wopi implements WopiInterface
         string $xWopiOldLock,
         RequestInterface $request
     ): ResponseInterface {
-        $this->unlock($fileId, $accessToken, $xWopiLock, $request);
+        if ($xWopiOldLock === null) {
+            return $this->lock($fileId, $accessToken, $xWopiLock, $request);
+        }
+
+        $this->unlock($fileId, $accessToken, $xWopiOldLock, $request);
 
         return $this->lock($fileId, $accessToken, $xWopiLock, $request);
     }
