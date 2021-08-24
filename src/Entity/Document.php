@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Entity;
 
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -46,9 +47,29 @@ class Document
     private string $name;
 
     /**
+     * @ORM\OneToMany(targetEntity=Share::class, mappedBy="document", orphanRemoval=true)
+     */
+    private Collection $share;
+
+    /**
      * @ORM\Column(name="size", type="bigint", options={"default": "0"}, nullable=true)
      */
     private string $size = '0';
+
+    public function __toString()
+    {
+        return $this->getFilename();
+    }
+
+    public function addShare(Share $share): self
+    {
+        if (!$this->share->contains($share)) {
+            $this->share[] = $share;
+            $share->setDocument($this);
+        }
+
+        return $this;
+    }
 
     public function getContent()
     {
@@ -80,9 +101,29 @@ class Document
         return $this->name;
     }
 
+    /**
+     * @return Collection|Share[]
+     */
+    public function getShare(): Collection
+    {
+        return $this->share;
+    }
+
     public function getSize(): string
     {
         return $this->size;
+    }
+
+    public function removeShare(Share $share): self
+    {
+        if ($this->share->removeElement($share)) {
+            // set the owning side to null (unless already changed)
+            if ($share->getDocument() === $this) {
+                $share->setDocument(null);
+            }
+        }
+
+        return $this;
     }
 
     public function setContent($content): self

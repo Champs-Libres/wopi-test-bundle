@@ -10,8 +10,8 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiTestBundle\Entity\Document;
-use ChampsLibres\WopiTestBundle\Entity\DocumentRevision;
 use ChampsLibres\WopiTestBundle\Entity\Lock;
+use ChampsLibres\WopiTestBundle\Entity\Share;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Config\UserMenu;
@@ -39,6 +39,8 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToCrud('Documents', 'fas fa-list', Document::class);
 
         yield MenuItem::linkToCrud('Locks', 'fas fa-list', Lock::class);
+
+        yield MenuItem::linkToCrud('Shares', 'fas fa-list', Share::class);
 //        yield MenuItem::linkToCrud('Documents revisions', 'fas fa-list', DocumentRevision::class);
 //        yield MenuItem::linkToCrud('Revisions', 'fas fa-list', Revision::class);
 

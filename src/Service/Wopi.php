@@ -20,6 +20,8 @@ use Psr\Http\Message\ResponseInterface;
 use SimpleThings\EntityAudit\AuditReader;
 use Symfony\Component\Security\Core\Security;
 
+use function strlen;
+
 final class Wopi implements WopiInterface
 {
     private AuditReader $auditReader;
@@ -125,7 +127,7 @@ final class Wopi implements WopiInterface
             $this->psr17->createStream('') :
             $this->psr17->createStreamFromResource($contentResource);
 
-        $response = $this
+        return $this
             ->psr17
             ->createResponse()
             ->withHeader(
@@ -141,8 +143,6 @@ final class Wopi implements WopiInterface
                 sprintf('attachment; filename=%s', $document->getFilename())
             )
             ->withBody($content);
-
-        return $response;
     }
 
     public function getLock(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
@@ -280,7 +280,7 @@ final class Wopi implements WopiInterface
                 ->psr17
                 ->createResponse(409);
         }
-        */
+         */
 
         $body = (string) $request->getBody();
 
@@ -361,10 +361,10 @@ final class Wopi implements WopiInterface
                 ->psr17
                 ->createResponse(409)
                 ->withAddedHeader('X-WOPI-Lock', '');
-            }
+        }
 
         if (null !== $currentLock) {
-            if ($xWopiLock !== $currentLock->getLock()) {
+            if ($currentLock->getLock() !== $xWopiLock) {
                 return $this
                     ->psr17
                     ->createResponse(409)
@@ -389,7 +389,7 @@ final class Wopi implements WopiInterface
         string $xWopiOldLock,
         RequestInterface $request
     ): ResponseInterface {
-        if ($xWopiOldLock === null) {
+        if (null === $xWopiOldLock) {
             return $this->lock($fileId, $accessToken, $xWopiLock, $request);
         }
 
