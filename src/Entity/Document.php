@@ -36,7 +36,7 @@ class Document
 
     /**
      * @ORM\OneToOne(targetEntity="Lock", inversedBy="document", cascade={"persist", "remove"}, orphanRemoval=true)
-     * @ORM\JoinColumn(name="document_id", referencedColumnName="id", onDelete="CASCADE")
+     * @ORM\JoinColumn(name="id", referencedColumnName="id", onDelete="CASCADE")
      */
     private ?Lock $lock;
 
