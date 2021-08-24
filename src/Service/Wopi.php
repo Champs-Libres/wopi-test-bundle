@@ -89,7 +89,7 @@ final class Wopi implements WopiInterface
                     'SupportsGetLock' => true,
                     'SupportsExtendedLockLength' => true,
                     'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
-                    'LastModifiedTime' => $revision->getTimestamp()->format('c'),
+                    'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.uP'),
                     'SupportsUpdate' => true,
                     'SupportsRename' => false,
                     'DisablePrint' => false,
