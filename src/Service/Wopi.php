@@ -18,6 +18,7 @@ use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use SimpleThings\EntityAudit\AuditReader;
+use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
 
 use function strlen;
@@ -30,6 +31,8 @@ final class Wopi implements WopiInterface
 
     private Psr17Interface $psr17;
 
+    private RouterInterface $routerInterface;
+
     private Security $security;
 
     private WopiDiscoveryInterface $wopiDiscovery;
@@ -39,13 +42,15 @@ final class Wopi implements WopiInterface
         WopiDiscoveryInterface $wopiDiscovery,
         DocumentRepository $documentRepository,
         AuditReader $auditReader,
-        Security $security
+        Security $security,
+        RouterInterface $routerInterface
     ) {
         $this->psr17 = $psr17;
         $this->wopiDiscovery = $wopiDiscovery;
         $this->documentRepository = $documentRepository;
         $this->auditReader = $auditReader;
         $this->security = $security;
+        $this->routerInterface = $routerInterface;
     }
 
     public function checkFileInfo(
@@ -53,21 +58,22 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        [$documentId, $documentRevision] = explode('-', $fileId, 2);
+        [$documentId, $documentRevisionId] = explode('-', $fileId, 2);
 
-        if (null === $documentRevision) {
-            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        if (null === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
         }
 
-        $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(Document::class, $documentId));
-        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
+        $revision = $this->auditReader->findRevision($documentRevisionId);
+        $document = $this->auditReader->find(Document::class, $documentId, $documentRevisionId);
 
-        if ([] === $this->wopiDiscovery->discoverExtension($document->getExtension())) {
-            return $this
-                ->psr17
-                ->createResponse(404);
-        }
-
+        /*
+                if ([] === $this->wopiDiscovery->discoverExtension($document->getExtension())) {
+                    return $this
+                        ->psr17
+                        ->createResponse(404);
+                }
+         */
         $user = $this->security->getUser();
 
         // TODO: Find first revision and get user/owner from it.
@@ -83,10 +89,12 @@ final class Wopi implements WopiInterface
                     'OwnerId' => 'Symfony',
                     'Size' => (int) $document->getSize(),
                     'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
-                    'Version' => sprintf('v%s', $documentRevision),
+                    'Version' => sprintf('v%s', $documentRevisionId),
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
                     'UserCanNotWriteRelative' => false,
+                    'SupportsUserInfo' => false,
+                    'SupportsDeleteFile' => true,
                     'SupportsLocks' => true,
                     'SupportsGetLock' => true,
                     'SupportsExtendedLockLength' => true,
@@ -130,6 +138,10 @@ final class Wopi implements WopiInterface
         return $this
             ->psr17
             ->createResponse()
+            ->withHeader(
+                'X-WOPI-ItemVersion',
+                sprintf('v%s', $documentRevisionId)
+            )
             ->withHeader(
                 'Content-Type',
                 'application/octet-stream',
@@ -206,7 +218,11 @@ final class Wopi implements WopiInterface
 
             return $this
                 ->psr17
-                ->createResponse();
+                ->createResponse()
+                ->withHeader(
+                    'X-WOPI-ItemVersion',
+                    sprintf('v%s', $documentRevisionId)
+                );
         }
 
         if ($lock->getLock() === $xWopiLock) {
@@ -245,7 +261,11 @@ final class Wopi implements WopiInterface
             if ('0' !== $document->getSize()) {
                 return $this
                     ->psr17
-                    ->createResponse(409);
+                    ->createResponse(409)
+                    ->withHeader(
+                        'X-WOPI-ItemVersion',
+                        sprintf('v%s', $documentRevisionId)
+                    );
             }
         }
 
@@ -255,7 +275,14 @@ final class Wopi implements WopiInterface
                 return $this
                     ->psr17
                     ->createResponse(409)
-                    ->withAddedHeader('X-WOPI-Lock', $currentLock->getLock());
+                    ->withHeader(
+                        'X-WOPI-Lock',
+                        $currentLock->getLock()
+                    )
+                    ->withHeader(
+                        'X-WOPI-ItemVersion',
+                        sprintf('v%s', $documentRevisionId)
+                    );
             }
         }
 
@@ -276,10 +303,20 @@ final class Wopi implements WopiInterface
 
         $this->documentRepository->add($document);
 
+        // New revision.
+        $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+
         return $this
             ->psr17
             ->createResponse()
-            ->withAddedHeader('X-WOPI-Lock', $xWopiLock);
+            ->withHeader(
+                'X-WOPI-Lock',
+                $xWopiLock
+            )
+            ->withHeader(
+                'X-WOPI-ItemVersion',
+                sprintf('v%s', $documentRevisionId)
+            );
     }
 
     public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
@@ -293,11 +330,35 @@ final class Wopi implements WopiInterface
         $new->setSize($request->getHeaderLine('content-length'));
 
         $this->documentRepository->add($new);
+        $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $new->getId());
+
+        $uri = $this
+            ->psr17
+            ->createUri(
+                $this
+                    ->routerInterface
+                    ->generate(
+                        'checkFileInfo',
+                        [
+                            'fileId' => sprintf('%s-%s', $new->getId(), $documentRevisionId),
+                        ],
+                        RouterInterface::ABSOLUTE_URL
+                    )
+            )
+            ->withQuery(http_build_query([
+                'access_token' => $accessToken,
+            ]));
+
+        $properties = [
+            'Name' => $new->getFilename(),
+            'Url' => (string) $uri,
+        ];
 
         return $this
             ->psr17
             ->createResponse()
-            ->withHeader('Content-Type', 'application/json');
+            ->withHeader('Content-Type', 'application/json')
+            ->withBody($this->psr17->createStream((string) json_encode($properties)));
     }
 
     public function putUserInfo(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
@@ -362,7 +423,11 @@ final class Wopi implements WopiInterface
         return $this
             ->psr17
             ->createResponse()
-            ->withAddedHeader('X-WOPI-Lock', '');
+            ->withAddedHeader('X-WOPI-Lock', '')
+            ->withHeader(
+                'X-WOPI-ItemVersion',
+                sprintf('v%s', $documentRevisionId)
+            );
     }
 
     public function unlockAndRelock(
@@ -395,7 +460,7 @@ final class Wopi implements WopiInterface
         return $this
             ->psr17
             ->createResponse()
-            ->withHeader('content', 'application/json')
+            ->withHeader('Content-Type', 'application/json')
             ->withBody($this->psr17->createStream($data));
     }
 }
