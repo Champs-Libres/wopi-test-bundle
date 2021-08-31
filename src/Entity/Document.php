@@ -36,12 +36,6 @@ class Document
     private int $id;
 
     /**
-     * @ORM\OneToOne(targetEntity="Lock", inversedBy="document", cascade={"persist", "remove"}, orphanRemoval=true)
-     * @ORM\JoinColumn(name="lock_id", referencedColumnName="id", onDelete="CASCADE")
-     */
-    private ?Lock $lock;
-
-    /**
      * @ORM\Column(name="name", type="string", length=255, nullable=false)
      */
     private string $name;
@@ -91,11 +85,6 @@ class Document
         return $this->id;
     }
 
-    public function getLock(): ?Lock
-    {
-        return $this->lock;
-    }
-
     public function getName(): ?string
     {
         return $this->name;
@@ -136,13 +125,6 @@ class Document
     public function setExtension(string $extension): self
     {
         $this->extension = $extension;
-
-        return $this;
-    }
-
-    public function setLock(?Lock $lock): self
-    {
-        $this->lock = $lock;
 
         return $this;
     }

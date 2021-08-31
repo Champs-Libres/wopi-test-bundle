@@ -10,7 +10,7 @@ declare(strict_types=1);
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
-use ChampsLibres\WopiLib\WopiInterface;
+use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
 use ChampsLibres\WopiTestBundle\Service\Configuration\ConfigurableWopiConfiguration;
 use ChampsLibres\WopiTestBundle\Service\Wopi;
 

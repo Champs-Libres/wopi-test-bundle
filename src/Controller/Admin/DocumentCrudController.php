@@ -11,10 +11,10 @@ namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
+use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
-use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
@@ -30,7 +30,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Exception\ForbiddenActionException;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\EntityFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\FilterFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\PaginatorFactory;
-use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
@@ -39,6 +38,8 @@ use EasyCorp\Bundle\EasyAdminBundle\Security\Permission;
 use Exception;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
+use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
@@ -49,9 +50,13 @@ final class DocumentCrudController extends AbstractCrudController
 
     private AuditReader $auditReader;
 
-    private DocumentRepository $documentRepository;
+    private DocumentLockManagerInterface $documentLockManager;
+
+    private HttpMessageFactoryInterface $httpMessageFactory;
 
     private Psr17Interface $psr17;
+
+    private RequestStack $requestStack;
 
     private RouterInterface $router;
 
@@ -62,16 +67,17 @@ final class DocumentCrudController extends AbstractCrudController
     private WopiDiscoveryInterface $wopiDiscovery;
 
     public function __construct(
-        DocumentRepository $documentRepository,
         WopiConfigurationInterface $wopiConfiguration,
         WopiDiscoveryInterface $wopiDiscovery,
+        DocumentLockManagerInterface $documentLockManager,
         RouterInterface $router,
         Psr17Interface $psr17,
         AuditReader $auditReader,
         Security $security,
-        AdminUrlGenerator $adminUrlGenerator
+        AdminUrlGenerator $adminUrlGenerator,
+        HttpMessageFactoryInterface $httpMessageFactory,
+        RequestStack $requestStack
     ) {
-        $this->documentRepository = $documentRepository;
         $this->wopiConfiguration = $wopiConfiguration;
         $this->wopiDiscovery = $wopiDiscovery;
         $this->router = $router;
@@ -79,13 +85,18 @@ final class DocumentCrudController extends AbstractCrudController
         $this->auditReader = $auditReader;
         $this->security = $security;
         $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->documentLockManager = $documentLockManager;
+        $this->httpMessageFactory = $httpMessageFactory;
+        $this->requestStack = $requestStack;
     }
 
     public function configureActions(Actions $actions): Actions
     {
+        $request = $this->httpMessageFactory->createRequest($this->requestStack->getCurrentRequest());
+
         $unlockDocument = Action::new('unlock', 'Unlock')
             ->linkToCrudAction('unlockDocument')
-            ->displayIf(static fn (Document $document): bool => null !== $document->getLock());
+            ->displayIf(fn (Document $document): bool => $this->documentLockManager->hasLock((string) $document->getId(), $request));
 
         $showHistory = Action::new('history', 'History')
             ->linkToCrudAction('showHistory');
@@ -107,7 +118,7 @@ final class DocumentCrudController extends AbstractCrudController
                 $showHistory
             )
             ->add(Crud::PAGE_EDIT, Action::INDEX)
-            ->update(Crud::PAGE_INDEX, Action::EDIT, static fn (Action $action) => $action->displayIf(static fn (Document $document): bool => null === $document->getLock()))
+            ->update(Crud::PAGE_INDEX, Action::EDIT, fn (Action $action) => $action->displayIf(fn (Document $document): bool => !$this->documentLockManager->hasLock((string) $document->getId(), $request)))
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
@@ -134,11 +145,6 @@ final class DocumentCrudController extends AbstractCrudController
         yield WopiDocumentRevisionField::new('id');
 
         yield WopiDocumentRevisionTimestampField::new('id');
-
-        yield AssociationField::new('lock')
-            ->hideWhenCreating()
-            ->hideWhenUpdating()
-            ->setTemplatePath('@WopiTest/fields/lock.html.twig');
     }
 
     public function edit(AdminContext $context)
@@ -267,8 +273,7 @@ final class DocumentCrudController extends AbstractCrudController
     {
         $document = $context->getEntity()->getInstance();
 
-        $document->setLock(null);
-        $this->documentRepository->add($document);
+        $this->documentLockManager->deleteLock($document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
 
         return $this->redirect($context->getReferrer());
     }
@@ -278,10 +283,9 @@ final class DocumentCrudController extends AbstractCrudController
         $entityManager = $this->getDoctrine()->getManagerForClass($batchActionDto->getEntityFqcn());
 
         foreach ($batchActionDto->getEntityIds() as $id) {
-            $entityManager->find(Document::class, $id)->setLock(null);
+            $document = $entityManager->find(Document::class, $id);
+            $this->documentLockManager->deleteLock($document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
         }
-
-        $entityManager->flush();
 
         return $this->redirect($batchActionDto->getReferrerUrl());
     }
