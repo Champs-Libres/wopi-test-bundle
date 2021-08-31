@@ -174,15 +174,7 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        $data = [
-            'ShareUrl' => 'TODO',
-        ];
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader('Content-Type', 'application/json')
-            ->withBody($this->psr17->createStream((string) json_encode($data)));
+        return $this->getDebugResponse(__FUNCTION__, $request);
     }
 
     public function lock(
@@ -221,21 +213,15 @@ final class Wopi implements WopiInterface
             return $this->refreshLock($fileId, $accessToken, $xWopiLock, $request);
         }
 
-        if ($lock->getLock() !== $xWopiLock) {
-            $revision = $this
-                ->auditReader
-                ->findRevision($this->auditReader->getCurrentRevision(Document::class, $documentId));
-
-            return $this
-                ->psr17
-                ->createResponse(409)
-                ->withAddedHeader('X-WOPI-Lock', $lock->getLock())
-                ->withAddedHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
-        }
+        $revision = $this
+            ->auditReader
+            ->findRevision($this->auditReader->getCurrentRevision(Document::class, $documentId));
 
         return $this
             ->psr17
-            ->createResponse();
+            ->createResponse(409)
+            ->withAddedHeader('X-WOPI-Lock', $lock->getLock())
+            ->withAddedHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
     }
 
     public function putFile(
@@ -298,7 +284,6 @@ final class Wopi implements WopiInterface
 
     public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-//        $document = $this->documentRepository->findOneBy(['id' => $fileId]);
         $pathInfo = pathinfo($request->getHeaderLine('X-WOPI-SuggestedTarget'));
 
         $new = new Document();
@@ -363,13 +348,11 @@ final class Wopi implements WopiInterface
                 ->withAddedHeader('X-WOPI-Lock', '');
         }
 
-        if (null !== $currentLock) {
-            if ($currentLock->getLock() !== $xWopiLock) {
-                return $this
-                    ->psr17
-                    ->createResponse(409)
-                    ->withAddedHeader('X-WOPI-Lock', $currentLock->getLock());
-            }
+        if ($currentLock->getLock() !== $xWopiLock) {
+            return $this
+                ->psr17
+                ->createResponse(409)
+                ->withAddedHeader('X-WOPI-Lock', $currentLock->getLock());
         }
 
         $document->setLock(null);

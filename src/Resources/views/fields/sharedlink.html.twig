@@ -1,0 +1,5 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{# @var field \EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto #}
+{# @var entity \EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto #}
+{# this template is used to display Doctrine entity primary keys #}
+<a href="{{ sign_url(absolute_url(path('share', {uuid: field.formattedValue}))) }}">{{ sign_url(absolute_url(path('share', {uuid: field.formattedValue}))) }}</a>

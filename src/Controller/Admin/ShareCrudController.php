@@ -25,12 +25,19 @@ final class ShareCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        yield IdField::new('id')->hideWhenCreating()->hideWhenUpdating();
+        yield IdField::new('id')
+            ->hideWhenCreating()
+            ->hideWhenUpdating();
 
         yield AssociationField::new('document')
-            ->onlyWhenCreating();
+            ->hideWhenUpdating();
 
         yield TextField::new('uuid')
+            ->onlyOnIndex();
+
+        yield TextField::new('uuid')
+            ->setLabel('Download link')
+            ->setTemplatePath('@WopiTest/fields/sharedlink.html.twig')
             ->onlyOnIndex();
     }
 

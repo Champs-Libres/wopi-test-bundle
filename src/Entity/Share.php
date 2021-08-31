@@ -32,6 +32,11 @@ class Share
     private $id;
 
     /**
+     * @ORM\Column(type="integer", nullable=true)
+     */
+    private ?int $revisionId;
+
+    /**
      * @ORM\Column(type="uuid", unique=true)
      */
     private Uuid $uuid;
@@ -51,14 +56,31 @@ class Share
         return $this->id;
     }
 
+    public function getRevisionId(): ?int
+    {
+        return $this->revisionId;
+    }
+
     public function getUuid()
     {
         return $this->uuid;
     }
 
+    public function hasRevisionId(): bool
+    {
+        return null !== $this->revisionId;
+    }
+
     public function setDocument(?Document $document): self
     {
         $this->document = $document;
+
+        return $this;
+    }
+
+    public function setRevisionId(?int $revisionId): self
+    {
+        $this->revisionId = $revisionId;
 
         return $this;
     }
