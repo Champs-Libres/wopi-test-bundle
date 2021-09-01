@@ -13,6 +13,7 @@ use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
 use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
+use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
@@ -124,7 +125,7 @@ final class DocumentCrudController extends AbstractCrudController
                 $showHistory
             )
             ->add(Crud::PAGE_EDIT, Action::INDEX)
-            ->update(Crud::PAGE_INDEX, Action::EDIT, fn (Action $action) => $action->displayIf(fn (Document $document): bool => !$this->documentLockManager->hasLock((string) $document->getId(), $request)))
+//            ->update(Crud::PAGE_INDEX, Action::EDIT, fn (Action $action) => $action->displayIf(fn (Document $document): bool => !$this->documentLockManager->hasLock((string) $document->getId(), $request)))
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
@@ -151,6 +152,10 @@ final class DocumentCrudController extends AbstractCrudController
         yield WopiDocumentRevisionField::new('id');
 
         yield WopiDocumentRevisionTimestampField::new('id');
+
+        yield WopiDocumentLockField::new('id')
+            ->setTemplatePath('@WopiTest/fields/lock.html.twig')
+            ->setSortable(false);
     }
 
     public function edit(AdminContext $context)

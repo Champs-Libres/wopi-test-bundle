@@ -2,7 +2,7 @@
 {# @var field \EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto #}
 {# @var entity \EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto #}
 {# this template is used to display Doctrine entity primary keys #}
-{% if null == field.formattedValue %}
+{% if false == field.formattedValue %}
     <span style="color: green;"><i class="fas fa-unlock fa-unlock-2x"></i></span>
 {% else %}
     <span style="color: red;"><i class="fas fa-lock fa-lock-2x"></i></span>

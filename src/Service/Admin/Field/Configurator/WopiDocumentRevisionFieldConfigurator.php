@@ -31,8 +31,9 @@ final class WopiDocumentRevisionFieldConfigurator implements FieldConfiguratorIn
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
         $revision = $this->auditReader->getEntityHistory(Document::class, $field->getValue());
+        $revisionId = $this->auditReader->getCurrentRevision(Document::class, $field->getValue());
 
-        $field->setFormattedValue(count($revision));
+        $field->setFormattedValue(sprintf('%s (#%s)', count($revision), $revisionId));
     }
 
     public function supports(FieldDto $field, EntityDto $entityDto): bool
