@@ -273,7 +273,7 @@ final class DocumentCrudController extends AbstractCrudController
     {
         $document = $context->getEntity()->getInstance();
 
-        $this->documentLockManager->deleteLock($document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
+        $this->documentLockManager->deleteLock((string) $document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
 
         return $this->redirect($context->getReferrer());
     }
@@ -284,7 +284,7 @@ final class DocumentCrudController extends AbstractCrudController
 
         foreach ($batchActionDto->getEntityIds() as $id) {
             $document = $entityManager->find(Document::class, $id);
-            $this->documentLockManager->deleteLock($document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
+            $this->documentLockManager->deleteLock((string) $document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
         }
 
         return $this->redirect($batchActionDto->getReferrerUrl());
