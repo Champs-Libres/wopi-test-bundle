@@ -269,22 +269,12 @@ final class Wopi implements WopiInterface
             }
         }
 
-        // File is unlocked.
-        /*
-        if (0 !== $document->getSize()) {
-            return $this
-                ->psr17
-                ->createResponse(409);
-        }
-         */
-
         $body = (string) $request->getBody();
 
         $document->setContent($body);
         $document->setSize((string) strlen($body));
 
         $this->documentRepository->add($document);
-        $this->documentLockManager->setLock($documentId, $xWopiLock, $request);
 
         // New revision.
         $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
@@ -304,7 +294,51 @@ final class Wopi implements WopiInterface
 
     public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $pathInfo = pathinfo($request->getHeaderLine('X-WOPI-SuggestedTarget'));
+        if ($request->hasHeader('X-WOPI-SuggestedTarget')) {
+            $suggestedTarget = $request->getHeaderLine('X-WOPI-SuggestedTarget');
+
+            // If it starts with a dot...
+            if (0 === strpos($suggestedTarget, '.', 0)) {
+                [$documentId, $documentRevisionId] = explode('-', $fileId);
+                $document = $this->documentRepository->find($documentId);
+                $suggestedTarget = sprintf('%s%s', $document->getName(), $suggestedTarget);
+            }
+
+            $target = $suggestedTarget;
+        }
+
+        if ($request->hasHeader('X-WOPI-RelativeTarget')) {
+            $overwriteRelativeTarget = 'false';
+
+            if ($request->hasHeader('X-WOPI-OverwriteRelativeTarget')) {
+                $overwriteRelativeTarget = $request->getHeaderLine('X-WOPI-OverwriteRelativeTarget');
+            }
+            $overwriteRelativeTarget = 'false' === $overwriteRelativeTarget ? false : true;
+
+            $relativeTarget = $request->getHeaderLine('X-WOPI-RelativeTarget');
+
+            // @ TODO does not work yet.
+            if (true === $overwriteRelativeTarget) {
+                $relativeTargetPathInfo = pathinfo($relativeTarget);
+
+                $document = $this->documentRepository->findOneBy([
+                    'name' => $relativeTargetPathInfo['filename'],
+                    'extension' => $relativeTargetPathInfo['extension'],
+                ]);
+
+                if (null !== $document) {
+                    return $this
+                        ->psr17
+                        ->createResponse(409)
+                        ->withHeader('Content-Type', 'application/json')
+                        ->withHeader('X-WOPI-ValidRelativeTarget', sprintf('%s.%s', uniqid(), $relativeTargetPathInfo['extension']));
+                }
+            }
+
+            $target = $relativeTarget;
+        }
+
+        $pathInfo = pathinfo($target);
 
         $new = new Document();
         $new->setName($pathInfo['filename']);
@@ -386,7 +420,8 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse(409)
-                ->withAddedHeader('X-WOPI-Lock', '');
+                ->withHeader('X-WOPI-Lock', '')
+                ->withHeader('x-debug-path', 'here');
         }
 
         $currentLock = $this->documentLockManager->getLock($documentId, $request);
@@ -395,15 +430,17 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse(409)
-                ->withAddedHeader('X-WOPI-Lock', $currentLock);
+                ->withHeader('X-WOPI-Lock', $currentLock)
+                ->withHeader('x-debug-path', 'there');
         }
 
-        $this->documentLockManager->deleteLock($documentId, $request);
+        $return = $this->documentLockManager->deleteLock($documentId, $request);
 
         return $this
             ->psr17
             ->createResponse()
-            ->withAddedHeader('X-WOPI-Lock', '')
+            ->withHeader('x-debug-LockDeleted', (string) $return)
+            ->withHeader('X-WOPI-Lock', '')
             ->withHeader(
                 'X-WOPI-ItemVersion',
                 sprintf('v%s', $documentRevisionId)
@@ -417,10 +454,6 @@ final class Wopi implements WopiInterface
         string $xWopiOldLock,
         RequestInterface $request
     ): ResponseInterface {
-        if (null === $xWopiOldLock) {
-            return $this->lock($fileId, $accessToken, $xWopiLock, $request);
-        }
-
         $this->unlock($fileId, $accessToken, $xWopiOldLock, $request);
 
         return $this->lock($fileId, $accessToken, $xWopiLock, $request);
