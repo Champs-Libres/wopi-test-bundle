@@ -56,6 +56,8 @@ final class DocumentCrudController extends AbstractCrudController
 
     private HttpMessageFactoryInterface $httpMessageFactory;
 
+    private JWTManager $jwtManager;
+
     private Psr17Interface $psr17;
 
     private RequestStack $requestStack;
@@ -67,8 +69,6 @@ final class DocumentCrudController extends AbstractCrudController
     private WopiConfigurationInterface $wopiConfiguration;
 
     private WopiDiscoveryInterface $wopiDiscovery;
-
-    private JWTManager $jwtManager;
 
     public function __construct(
         WopiConfigurationInterface $wopiConfiguration,

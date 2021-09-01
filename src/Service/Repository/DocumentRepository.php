@@ -12,17 +12,23 @@ namespace ChampsLibres\WopiTestBundle\Service\Repository;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ObjectRepository;
+use SimpleThings\EntityAudit\AuditReader;
+use SimpleThings\EntityAudit\Revision;
+use Throwable;
 
 final class DocumentRepository implements ObjectRepository
 {
+    private AuditReader $auditReader;
+
     private EntityManagerInterface $entityManager;
 
     private ObjectRepository $repository;
 
-    public function __construct(EntityManagerInterface $entityManager)
+    public function __construct(EntityManagerInterface $entityManager, AuditReader $auditReader)
     {
         $this->entityManager = $entityManager;
         $this->repository = $entityManager->getRepository(Document::class);
+        $this->auditReader = $auditReader;
     }
 
     public function add(Document $document): void
@@ -55,9 +61,45 @@ final class DocumentRepository implements ObjectRepository
         return $this->repository->findBy($criteria, $orderBy, $limit, $offset);
     }
 
+    public function findFromFileId(string $fileId): ?Document
+    {
+        if (false === strpos($fileId, '-', 0)) {
+            $fileId .= '-0';
+        }
+
+        [$documentId, $documentRevisionId] = explode('-', $fileId, 2);
+
+        if (0 === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        return $this->find($documentId);
+    }
+
     public function findOneBy(array $criteria): ?Document
     {
         return $this->repository->findOneBy($criteria);
+    }
+
+    public function findRevisionFromFileId(string $fileId): ?Revision
+    {
+        if (false === strpos($fileId, '-', 0)) {
+            $fileId .= '-0';
+        }
+
+        [$documentId, $documentRevisionId] = explode('-', $fileId, 2);
+
+        if (0 === $documentRevisionId) {
+            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        try {
+            $revision = $this->auditReader->findRevision($documentRevisionId);
+        } catch (Throwable $e) {
+            return null;
+        }
+
+        return $revision;
     }
 
     public function getClassName(): string
