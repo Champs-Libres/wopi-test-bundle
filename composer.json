@@ -11,6 +11,7 @@
     "require": {
         "php": ">= 7.4",
         "ext-json": "*",
+        "lexik/jwt-authentication-bundle": "^2.12",
         "symfony/profiler-pack": "^1.0",
         "symfony/uid": "^5.3",
         "symfony/form": "^5.3",

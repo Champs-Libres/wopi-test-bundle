@@ -66,6 +66,6 @@ final class Security extends AbstractController
      */
     public function logoutAction()
     {
-        throw new RuntimeException('This should never be called directly.');
+        return $this->redirectToRoute('admin_wopi');
     }
 }

@@ -36,6 +36,8 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use EasyCorp\Bundle\EasyAdminBundle\Security\Permission;
 use Exception;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTManager;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
@@ -66,6 +68,8 @@ final class DocumentCrudController extends AbstractCrudController
 
     private WopiDiscoveryInterface $wopiDiscovery;
 
+    private JWTManager $jwtManager;
+
     public function __construct(
         WopiConfigurationInterface $wopiConfiguration,
         WopiDiscoveryInterface $wopiDiscovery,
@@ -76,7 +80,8 @@ final class DocumentCrudController extends AbstractCrudController
         Security $security,
         AdminUrlGenerator $adminUrlGenerator,
         HttpMessageFactoryInterface $httpMessageFactory,
-        RequestStack $requestStack
+        RequestStack $requestStack,
+        JWTTokenManagerInterface $jwtManager
     ) {
         $this->wopiConfiguration = $wopiConfiguration;
         $this->wopiDiscovery = $wopiDiscovery;
@@ -88,6 +93,7 @@ final class DocumentCrudController extends AbstractCrudController
         $this->documentLockManager = $documentLockManager;
         $this->httpMessageFactory = $httpMessageFactory;
         $this->requestStack = $requestStack;
+        $this->jwtManager = $jwtManager;
     }
 
     public function configureActions(Actions $actions): Actions
@@ -166,7 +172,7 @@ final class DocumentCrudController extends AbstractCrudController
             throw new Exception('Unsupported extension.');
         }
 
-        $configuration['access_token'] = $this->security->getUser()->getUserIdentifier();
+        $configuration['access_token'] = $this->jwtManager->create($this->security->getUser());
         $configuration['server'] = $this
             ->psr17
             ->createUri($discoverExtension[0]['urlsrc'])
