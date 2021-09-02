@@ -22,7 +22,6 @@ final class Configuration extends AbstractType
     {
         $builder
             ->add('server', TextType::class, ['label' => 'WOPI client'])
-            ->add('access_token', TextType::class, ['label' => 'WOPI access token'])
             ->add('access_token_ttl', IntegerType::class, ['label' => 'WOPI access token ttl'])
             ->add(
                 'submit',
