@@ -11,6 +11,7 @@
     "require": {
         "php": ">= 7.4",
         "ext-json": "*",
+        "champs-libres/wopi-bundle": "dev-master",
         "lexik/jwt-authentication-bundle": "^2.12",
         "symfony/profiler-pack": "^1.0",
         "symfony/uid": "^5.3",
@@ -19,18 +20,7 @@
         "easycorp/easyadmin-bundle": "^3.5",
         "sonata-project/entity-audit-bundle": "^1.4"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "/home/pol/dev/git/CL/wopi-lib"
-        },
-        {
-            "type": "path",
-            "url": "/home/pol/dev/git/CL/wopi-bundle"
-        }
-    ],
     "require-dev": {
-        "champs-libres/wopi-bundle": "dev-master",
         "drupol/php-conventions": "^5.0",
         "friends-of-phpspec/phpspec-code-coverage": "^6.1",
         "nyholm/psr7": "^1.4",
