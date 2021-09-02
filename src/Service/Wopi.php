@@ -124,7 +124,6 @@ final class Wopi implements WopiInterface
         $content = (null === $contentResource = $document->getContent()) ?
             $this->psr17->createStream('') :
             $this->psr17->createStreamFromResource($contentResource);
-        $contentStat = fstat($contentResource);
 
         return $this
             ->psr17
@@ -139,7 +138,7 @@ final class Wopi implements WopiInterface
             )
             ->withHeader(
                 'Content-Length',
-                $contentStat['size']
+                $document->getSize()
             )
             ->withHeader(
                 'Content-Disposition',
