@@ -12,7 +12,7 @@ namespace ChampsLibres\WopiTestBundle\Form\Type;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
+use Symfony\Component\Form\Extension\Core\Type\UrlType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -21,7 +21,7 @@ final class Configuration extends AbstractType
     public function buildForm(FormBuilderInterface $builder, array $options)
     {
         $builder
-            ->add('server', TextType::class, ['label' => 'WOPI client'])
+            ->add('server', UrlType::class, ['label' => 'WOPI client'])
             ->add('access_token_ttl', IntegerType::class, ['label' => 'WOPI access token ttl'])
             ->add(
                 'submit',
