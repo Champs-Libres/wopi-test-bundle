@@ -10,10 +10,8 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Service;
 
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
-use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
 use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
-use ChampsLibres\WopiTestBundle\Entity\Lock;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
@@ -27,8 +25,6 @@ use function strlen;
 final class Wopi implements WopiInterface
 {
     private AuditReader $auditReader;
-
-    private DocumentLockManagerInterface $documentLockManager;
 
     private DocumentRepository $documentRepository;
 
@@ -44,8 +40,7 @@ final class Wopi implements WopiInterface
         DocumentRepository $documentRepository,
         AuditReader $auditReader,
         Security $security,
-        RouterInterface $routerInterface,
-        DocumentLockManagerInterface $documentLockManager
+        RouterInterface $routerInterface
     ) {
         $this->psr17 = $psr17;
         $this->wopiDiscovery = $wopiDiscovery;
@@ -53,7 +48,6 @@ final class Wopi implements WopiInterface
         $this->auditReader = $auditReader;
         $this->security = $security;
         $this->routerInterface = $routerInterface;
-        $this->documentLockManager = $documentLockManager;
     }
 
     public function checkFileInfo(
@@ -107,7 +101,7 @@ final class Wopi implements WopiInterface
     {
         $document = $this->documentRepository->findFromFileId($fileId);
 
-        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+        if ($this->documentRepository->hasLock($document)) {
             return $this
                 ->psr17
                 ->createResponse(409);
@@ -163,11 +157,11 @@ final class Wopi implements WopiInterface
     {
         $document = $this->documentRepository->findFromFileId($fileId);
 
-        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+        if ($this->documentRepository->hasLock($document)) {
             return $this
                 ->psr17
                 ->createResponse()
-                ->withHeader('X-WOPI-Lock', $this->documentLockManager->getLock((string) $document->getId(), $request));
+                ->withHeader('X-WOPI-Lock', $this->documentRepository->getLock($document));
         }
 
         return $this
@@ -193,8 +187,8 @@ final class Wopi implements WopiInterface
         $document = $this->documentRepository->findFromFileId($fileId);
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
 
-        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
-            if ($xWopiLock === $currentLock = $this->documentLockManager->getLock((string) $document->getId(), $request)) {
+        if ($this->documentRepository->hasLock($document)) {
+            if ($xWopiLock === $currentLock = $this->documentRepository->getLock($document)) {
                 return $this->refreshLock($fileId, $accessToken, $xWopiLock, $request);
             }
 
@@ -209,7 +203,7 @@ final class Wopi implements WopiInterface
                 ->withHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
         }
 
-        $this->documentLockManager->setLock((string) $document->getId(), $xWopiLock, $request);
+        $this->documentRepository->lock($document, $xWopiLock);
 
         return $this
             ->psr17
@@ -231,7 +225,7 @@ final class Wopi implements WopiInterface
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
 
         // File is unlocked
-        if (false === $this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+        if (false === $this->documentRepository->hasLock($document)) {
             if ('0' !== $document->getSize()) {
                 return $this
                     ->psr17
@@ -244,8 +238,8 @@ final class Wopi implements WopiInterface
         }
 
         // File is locked
-        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
-            if ($xWopiLock !== $currentLock = $this->documentLockManager->getLock((string) $document->getId(), $request)) {
+        if ($this->documentRepository->hasLock($document)) {
+            if ($xWopiLock !== $currentLock = $this->documentRepository->getLock($document)) {
                 return $this
                     ->psr17
                     ->createResponse(409)
@@ -389,8 +383,8 @@ final class Wopi implements WopiInterface
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
 
-        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
-            if ($xWopiLock !== $currentLock = $this->documentLockManager->getLock((string) $document->getId(), $request)) {
+        if ($this->documentRepository->hasLock($document)) {
+            if ($xWopiLock !== $currentLock = $this->documentRepository->getLock($document)) {
                 return $this
                     ->psr17
                     ->createResponse(409)
@@ -415,14 +409,14 @@ final class Wopi implements WopiInterface
         $document = $this->documentRepository->findFromFileId($fileId);
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
 
-        if (!$this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+        if (!$this->documentRepository->hasLock($document)) {
             return $this
                 ->psr17
                 ->createResponse(409)
                 ->withHeader('X-WOPI-Lock', '');
         }
 
-        $currentLock = $this->documentLockManager->getLock((string) $document->getId(), $request);
+        $currentLock = $this->documentRepository->getLock($document);
 
         if ($currentLock !== $xWopiLock) {
             return $this
@@ -431,7 +425,7 @@ final class Wopi implements WopiInterface
                 ->withHeader('X-WOPI-Lock', $currentLock);
         }
 
-        $this->documentLockManager->deleteLock((string) $document->getId(), $request);
+        $this->documentRepository->deleteLock($document);
 
         return $this
             ->psr17

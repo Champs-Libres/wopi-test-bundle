@@ -9,32 +9,47 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Repository;
 
+use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ObjectRepository;
+use Psr\Http\Message\RequestInterface;
 use SimpleThings\EntityAudit\AuditReader;
 use SimpleThings\EntityAudit\Revision;
+use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Throwable;
 
 final class DocumentRepository implements ObjectRepository
 {
     private AuditReader $auditReader;
 
+    private DocumentLockManagerInterface $documentLockManager;
+
     private EntityManagerInterface $entityManager;
 
     private ObjectRepository $repository;
 
-    public function __construct(EntityManagerInterface $entityManager, AuditReader $auditReader)
+    private RequestInterface $request;
+
+    public function __construct(EntityManagerInterface $entityManager, AuditReader $auditReader, DocumentLockManagerInterface $documentLockManager, RequestStack $requestStack, HttpMessageFactoryInterface $httpMessageFactory)
     {
         $this->entityManager = $entityManager;
         $this->repository = $entityManager->getRepository(Document::class);
         $this->auditReader = $auditReader;
+        $this->documentLockManager = $documentLockManager;
+        $this->request = $httpMessageFactory->createRequest($requestStack->getCurrentRequest());
     }
 
     public function add(Document $document): void
     {
         $this->entityManager->persist($document);
         $this->entityManager->flush($document);
+    }
+
+    public function deleteLock(Document $document): bool
+    {
+        return $this->documentLockManager->deleteLock((string) $document->getId(), $this->request);
     }
 
     public function find($id): ?Document
@@ -105,6 +120,21 @@ final class DocumentRepository implements ObjectRepository
     public function getClassName(): string
     {
         return Document::class;
+    }
+
+    public function getLock(Document $document): string
+    {
+        return $this->documentLockManager->getLock((string) $document->getId(), $this->request);
+    }
+
+    public function hasLock(Document $document): bool
+    {
+        return $this->documentLockManager->hasLock((string) $document->getId(), $this->request);
+    }
+
+    public function lock(Document $document, string $lockId): bool
+    {
+        return $this->documentLockManager->setLock((string) $document->getId(), $lockId, $this->request);
     }
 
     public function remove(Document $document): void

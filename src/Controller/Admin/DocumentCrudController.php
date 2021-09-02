@@ -11,11 +11,11 @@ namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
 use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
-use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
+use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
@@ -41,8 +41,6 @@ use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTManager;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
-use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
@@ -53,15 +51,11 @@ final class DocumentCrudController extends AbstractCrudController
 
     private AuditReader $auditReader;
 
-    private DocumentLockManagerInterface $documentLockManager;
-
-    private HttpMessageFactoryInterface $httpMessageFactory;
+    private DocumentRepository $documentRepository;
 
     private JWTManager $jwtManager;
 
     private Psr17Interface $psr17;
-
-    private RequestStack $requestStack;
 
     private RouterInterface $router;
 
@@ -74,15 +68,13 @@ final class DocumentCrudController extends AbstractCrudController
     public function __construct(
         WopiConfigurationInterface $wopiConfiguration,
         WopiDiscoveryInterface $wopiDiscovery,
-        DocumentLockManagerInterface $documentLockManager,
         RouterInterface $router,
         Psr17Interface $psr17,
         AuditReader $auditReader,
         Security $security,
         AdminUrlGenerator $adminUrlGenerator,
-        HttpMessageFactoryInterface $httpMessageFactory,
-        RequestStack $requestStack,
-        JWTTokenManagerInterface $jwtManager
+        JWTTokenManagerInterface $jwtManager,
+        DocumentRepository $documentRepository
     ) {
         $this->wopiConfiguration = $wopiConfiguration;
         $this->wopiDiscovery = $wopiDiscovery;
@@ -91,19 +83,15 @@ final class DocumentCrudController extends AbstractCrudController
         $this->auditReader = $auditReader;
         $this->security = $security;
         $this->adminUrlGenerator = $adminUrlGenerator;
-        $this->documentLockManager = $documentLockManager;
-        $this->httpMessageFactory = $httpMessageFactory;
-        $this->requestStack = $requestStack;
         $this->jwtManager = $jwtManager;
+        $this->documentRepository = $documentRepository;
     }
 
     public function configureActions(Actions $actions): Actions
     {
-        $request = $this->httpMessageFactory->createRequest($this->requestStack->getCurrentRequest());
-
         $unlockDocument = Action::new('unlock', 'Unlock')
             ->linkToCrudAction('unlockDocument')
-            ->displayIf(fn (Document $document): bool => $this->documentLockManager->hasLock((string) $document->getId(), $request));
+            ->displayIf(fn (Document $document): bool => $this->documentRepository->hasLock($document));
 
         $showHistory = Action::new('history', 'History')
             ->linkToCrudAction('showHistory');
@@ -284,7 +272,7 @@ final class DocumentCrudController extends AbstractCrudController
     {
         $document = $context->getEntity()->getInstance();
 
-        $this->documentLockManager->deleteLock((string) $document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
+        $this->documentRepository->deleteLock($document);
 
         return $this->redirect($context->getReferrer());
     }
@@ -295,7 +283,7 @@ final class DocumentCrudController extends AbstractCrudController
 
         foreach ($batchActionDto->getEntityIds() as $id) {
             $document = $entityManager->find(Document::class, $id);
-            $this->documentLockManager->deleteLock((string) $document->getId(), $this->httpMessageFactory->createRequest($context->getRequest()));
+            $this->documentRepository->deleteLock($document);
         }
 
         return $this->redirect($batchActionDto->getReferrerUrl());

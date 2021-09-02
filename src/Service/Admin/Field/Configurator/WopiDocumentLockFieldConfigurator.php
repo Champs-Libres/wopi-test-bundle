@@ -9,33 +9,25 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Admin\Field\Configurator;
 
-use ChampsLibres\WopiLib\Service\DocumentLockManager;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
+use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
-use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
 
 final class WopiDocumentLockFieldConfigurator implements FieldConfiguratorInterface
 {
-    private DocumentLockManager $documentLockManager;
+    private DocumentRepository $documentRepository;
 
-    private HttpMessageFactoryInterface $httpMessageFactory;
-
-    private RequestStack $requestStack;
-
-    public function __construct(DocumentLockManager $documentLockManager, HttpMessageFactoryInterface $httpMessageFactory, RequestStack $requestStack)
+    public function __construct(DocumentRepository $documentRepository)
     {
-        $this->documentLockManager = $documentLockManager;
-        $this->httpMessageFactory = $httpMessageFactory;
-        $this->requestStack = $requestStack;
+        $this->documentRepository = $documentRepository;
     }
 
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
-        $isLocked = $this->documentLockManager->hasLock((string) $field->getValue(), $this->httpMessageFactory->createRequest($this->requestStack->getCurrentRequest()));
+        $isLocked = $this->documentRepository->hasLock($entityDto->getInstance());
 
         $field->setFormattedValue($isLocked);
     }
