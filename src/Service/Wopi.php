@@ -121,11 +121,10 @@ final class Wopi implements WopiInterface
         $document = $this->documentRepository->findFromFileId($fileId);
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
 
-        $documentRevision = $this->auditReader->find(Document::class, $document->getId(), $revision->getRev());
-
-        $content = (null === $contentResource = $documentRevision->getContent()) ?
+        $content = (null === $contentResource = $document->getContent()) ?
             $this->psr17->createStream('') :
             $this->psr17->createStreamFromResource($contentResource);
+        $contentStat = fstat($contentResource);
 
         return $this
             ->psr17
@@ -140,7 +139,7 @@ final class Wopi implements WopiInterface
             )
             ->withHeader(
                 'Content-Length',
-                $documentRevision->getSize()
+                $contentStat['size']
             )
             ->withHeader(
                 'Content-Disposition',
