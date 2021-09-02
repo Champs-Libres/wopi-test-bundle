@@ -105,7 +105,19 @@ final class Wopi implements WopiInterface
 
     public function deleteFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $document = $this->documentRepository->findFromFileId($fileId);
+
+        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+            return $this
+                ->psr17
+                ->createResponse(409);
+        }
+
+        $this->documentRepository->remove($document);
+
+        return $this
+            ->psr17
+            ->createResponse(200);
     }
 
     public function enumerateAncestors(
