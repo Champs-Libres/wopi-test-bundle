@@ -387,7 +387,23 @@ final class Wopi implements WopiInterface
         string $xWopiRequestedName,
         RequestInterface $request
     ): ResponseInterface {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $document = $this->documentRepository->findFromFileId($fileId);
+
+        if ($this->documentLockManager->hasLock((string) $document->getId(), $request)) {
+            if ($xWopiLock !== $currentLock = $this->documentLockManager->getLock((string) $document->getId(), $request)) {
+                return $this
+                    ->psr17
+                    ->createResponse(409)
+                    ->withHeader('X-WOPI-Lock', $currentLock);
+            }
+        }
+
+        $document->setName($xWopiRequestedName);
+        $this->documentRepository->add($document);
+
+        return $this
+            ->psr17
+            ->createResponse(200);
     }
 
     public function unlock(
