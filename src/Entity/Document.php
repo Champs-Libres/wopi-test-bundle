@@ -41,7 +41,7 @@ class Document
     private string $name;
 
     /**
-     * @ORM\OneToMany(targetEntity=Share::class, mappedBy="document", orphanRemoval=true)
+     * @ORM\OneToMany(targetEntity=Share::class, mappedBy="document", orphanRemoval=true, cascade={"persist"})
      */
     private Collection $share;
 
@@ -88,6 +88,11 @@ class Document
     public function getName(): ?string
     {
         return $this->name;
+    }
+
+    public function getSha256(): string
+    {
+        return base64_encode(hash('sha256', (string) $this->getContent()));
     }
 
     /**

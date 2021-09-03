@@ -14,6 +14,7 @@ use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\Share;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use loophp\psr17\Psr17Interface;
+use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use SimpleThings\EntityAudit\AuditReader;
@@ -25,6 +26,8 @@ use function strlen;
 final class Wopi implements WopiInterface
 {
     private AuditReader $auditReader;
+
+    private CacheItemPoolInterface $cache;
 
     private DocumentRepository $documentRepository;
 
@@ -38,12 +41,14 @@ final class Wopi implements WopiInterface
         AuditReader $auditReader,
         DocumentRepository $documentRepository,
         Psr17Interface $psr17,
+        CacheItemPoolInterface $cache,
         RouterInterface $routerInterface,
         Security $security
     ) {
         $this->auditReader = $auditReader;
         $this->documentRepository = $documentRepository;
         $this->psr17 = $psr17;
+        $this->cache = $cache;
         $this->routerInterface = $routerInterface;
         $this->security = $security;
     }
@@ -57,6 +62,15 @@ final class Wopi implements WopiInterface
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
         $user = $this->security->getUser();
 
+        if ($document->getShare()->isEmpty()) {
+            $share = new Share();
+            $share->setDocument($document);
+            $document->addShare($share);
+            $this->documentRepository->add($document);
+        }
+
+        $userCacheKey = sprintf('wopi_putUserInfo_%s', $this->security->getUser()->getUserIdentifier());
+
         return $this
             ->psr17
             ->createResponse()
@@ -69,9 +83,12 @@ final class Wopi implements WopiInterface
                     'UserId' => $user->getUserIdentifier(),
                     'Version' => sprintf('v%s', $revision->getRev()),
                     'ReadOnly' => false,
+                    'UserCanAttend' => true,
+                    'UserCanPresent' => true,
+                    'UserCanRename' => true,
                     'UserCanWrite' => true,
                     'UserCanNotWriteRelative' => false,
-                    'SupportsUserInfo' => false,
+                    'SupportsUserInfo' => true,
                     'SupportsDeleteFile' => true,
                     'SupportsLocks' => true,
                     'SupportsGetLock' => true,
@@ -85,6 +102,11 @@ final class Wopi implements WopiInterface
                     'SupportedShareUrlTypes' => [
                         'ReadOnly',
                     ],
+                    'DownloadUrl' => $this->routerInterface->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
+                    'FileSharingUrl' => $this->routerInterface->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
+                    'BreadcrumbBrandName' => 'BreadcrumbBrandName',
+                    'SHA256' => $document->getSha256(),
+                    'UserInfo' => (string) $this->cache->getItem($userCacheKey)->get(),
                 ]
             )));
     }
@@ -369,7 +391,15 @@ final class Wopi implements WopiInterface
 
     public function putUserInfo(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $userCacheKey = sprintf('wopi_putUserInfo_%s', $this->security->getUser()->getUserIdentifier());
+
+        $cacheItem = $this->cache->getItem($userCacheKey);
+        $cacheItem->set((string) $request->getBody());
+        $this->cache->save($cacheItem);
+
+        return $this
+            ->psr17
+            ->createResponse();
     }
 
     public function refreshLock(

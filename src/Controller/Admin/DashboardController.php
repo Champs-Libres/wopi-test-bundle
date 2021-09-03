@@ -46,6 +46,10 @@ final class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToRoute('Configuration', 'fas fa-cogs', 'configuration');
 
         yield MenuItem::linkToRoute('Capabilities', 'fas fa-info', 'hosting_capabilities');
+
+        yield MenuItem::section('WOPI Validator');
+
+        yield MenuItem::linkToRoute('Tests', 'fas fa-cogs', 'wopi_test');
     }
 
     public function configureUserMenu(UserInterface $user): UserMenu
