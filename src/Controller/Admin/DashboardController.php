@@ -38,8 +38,6 @@ final class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToCrud('Documents', 'fas fa-list', Document::class);
 
         yield MenuItem::linkToCrud('Shares', 'fas fa-list', Share::class);
-//        yield MenuItem::linkToCrud('Documents revisions', 'fas fa-list', DocumentRevision::class);
-//        yield MenuItem::linkToCrud('Revisions', 'fas fa-list', Revision::class);
 
         yield MenuItem::section('WOPI Client');
 
@@ -49,7 +47,7 @@ final class DashboardController extends AbstractDashboardController
 
         yield MenuItem::section('WOPI Validator');
 
-        yield MenuItem::linkToRoute('Tests', 'fas fa-cogs', 'wopi_test');
+        yield MenuItem::linkToRoute('Tests', 'fas fa-info', 'wopi_test');
     }
 
     public function configureUserMenu(UserInterface $user): UserMenu
