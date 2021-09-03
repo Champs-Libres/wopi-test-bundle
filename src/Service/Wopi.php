@@ -9,9 +9,9 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service;
 
-use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
 use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
+use ChampsLibres\WopiTestBundle\Entity\Share;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
@@ -35,19 +35,17 @@ final class Wopi implements WopiInterface
     private Security $security;
 
     public function __construct(
-        Psr17Interface $psr17,
-        WopiDiscoveryInterface $wopiDiscovery,
-        DocumentRepository $documentRepository,
         AuditReader $auditReader,
-        Security $security,
-        RouterInterface $routerInterface
+        DocumentRepository $documentRepository,
+        Psr17Interface $psr17,
+        RouterInterface $routerInterface,
+        Security $security
     ) {
-        $this->psr17 = $psr17;
-        $this->wopiDiscovery = $wopiDiscovery;
-        $this->documentRepository = $documentRepository;
         $this->auditReader = $auditReader;
-        $this->security = $security;
+        $this->documentRepository = $documentRepository;
+        $this->psr17 = $psr17;
         $this->routerInterface = $routerInterface;
+        $this->security = $security;
     }
 
     public function checkFileInfo(
@@ -57,15 +55,6 @@ final class Wopi implements WopiInterface
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
         $revision = $this->documentRepository->findRevisionFromFileId($fileId);
-
-        /*
-                if ([] === $this->wopiDiscovery->discoverExtension($document->getExtension())) {
-                    return $this
-                        ->psr17
-                        ->createResponse(404);
-                }
-         */
-
         $user = $this->security->getUser();
 
         return $this
@@ -77,7 +66,7 @@ final class Wopi implements WopiInterface
                     'BaseFileName' => $document->getFilename(),
                     'OwnerId' => 'Symfony',
                     'Size' => (int) $document->getSize(),
-                    'UserId' => null === $user ? 'anonymous' : $user->getUserIdentifier(),
+                    'UserId' => $user->getUserIdentifier(),
                     'Version' => sprintf('v%s', $revision->getRev()),
                     'ReadOnly' => false,
                     'UserCanWrite' => true,
@@ -87,12 +76,15 @@ final class Wopi implements WopiInterface
                     'SupportsLocks' => true,
                     'SupportsGetLock' => true,
                     'SupportsExtendedLockLength' => true,
-                    'UserFriendlyName' => 'User ' . $user === null ? 'anonymous' : $user->getUserIdentifier(),
+                    'UserFriendlyName' => sprintf('User %s', $user->getUserIdentifier()),
                     'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.uP'),
                     'SupportsUpdate' => true,
-                    'SupportsRename' => false,
+                    'SupportsRename' => true,
                     'DisablePrint' => false,
                     'AllowExternalMarketplace' => true,
+                    'SupportedShareUrlTypes' => [
+                        'ReadOnly',
+                    ],
                 ]
             )));
     }
@@ -175,7 +167,24 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        $document = $this->documentRepository->findFromFileId($fileId);
+
+        if (null !== $share = $document->getShare()->current()) {
+            /** @var Share $share */
+            $properties = [
+                'ShareUrl' => $this->routerInterface->generate('share', ['uuid' => $share->getUuid()], RouterInterface::ABSOLUTE_URL),
+            ];
+
+            return $this
+                ->psr17
+                ->createResponse()
+                ->withHeader('Content-Type', 'application/json')
+                ->withBody($this->psr17->createStream((string) json_encode($properties)));
+        }
+
+        return $this
+            ->psr17
+            ->createResponse(501);
     }
 
     public function lock(
