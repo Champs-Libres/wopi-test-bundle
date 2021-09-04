@@ -231,7 +231,7 @@ final class DocumentCrudController extends AbstractCrudController
         }
 
         $entity = $context->getEntity();
-        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getUuid());
+        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
             'revisions' => $entities,
