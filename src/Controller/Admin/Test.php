@@ -123,7 +123,7 @@ final class Test implements DashboardControllerInterface
             $this->entityManager->flush();
         }
 
-        $url = $this->router->generate('checkFileInfo', ['fileId' => sprintf('%s-%s', $document->getId(), 1)], RouterInterface::ABSOLUTE_URL);
+        $url = $this->router->generate('checkFileInfo', ['fileId' => $document->getUuid()], RouterInterface::ABSOLUTE_URL);
 
         $command = sprintf(
             'docker-compose run wopivalidator -- -w %s -l 0 -t %s',

@@ -61,7 +61,7 @@ class Share
         return $this->revisionId;
     }
 
-    public function getUuid()
+    public function getUuid(): Uuid
     {
         return $this->uuid;
     }
@@ -85,7 +85,7 @@ class Share
         return $this;
     }
 
-    public function setUuid($uuid): self
+    public function setUuid(Uuid $uuid): self
     {
         $this->uuid = $uuid;
 

@@ -11,6 +11,7 @@ namespace ChampsLibres\WopiTestBundle\Entity;
 
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * @ORM\Table(name="documents")
@@ -49,6 +50,16 @@ class Document
      * @ORM\Column(name="size", type="bigint", options={"default": "0"}, nullable=true)
      */
     private string $size = '0';
+
+    /**
+     * @ORM\Column(type="uuid", unique=true)
+     */
+    private Uuid $uuid;
+
+    public function __construct()
+    {
+        $this->uuid = Uuid::v4();
+    }
 
     public function __toString()
     {
@@ -108,6 +119,11 @@ class Document
         return $this->size;
     }
 
+    public function getUuid(): Uuid
+    {
+        return $this->uuid;
+    }
+
     public function removeShare(Share $share): self
     {
         if ($this->share->removeElement($share)) {
@@ -144,6 +160,13 @@ class Document
     public function setSize(string $size): self
     {
         $this->size = $size;
+
+        return $this;
+    }
+
+    public function setUuid(Uuid $uuid): self
+    {
+        $this->uuid = $uuid;
 
         return $this;
     }

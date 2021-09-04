@@ -113,7 +113,6 @@ final class DocumentCrudController extends AbstractCrudController
                 $showHistory
             )
             ->add(Crud::PAGE_EDIT, Action::INDEX)
-//            ->update(Crud::PAGE_INDEX, Action::EDIT, fn (Action $action) => $action->displayIf(fn (Document $document): bool => !$this->documentLockManager->hasLock((string) $document->getId(), $request)))
             ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
             ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
@@ -177,7 +176,7 @@ final class DocumentCrudController extends AbstractCrudController
                             ->generate(
                                 'checkFileInfo',
                                 [
-                                    'fileId' => sprintf('%s-%s', $document->getId(), $documentRevision),
+                                    'fileId' => $document->getUuid(),
                                 ],
                                 UrlGeneratorInterface::ABSOLUTE_URL
                             ),                    ]
@@ -237,14 +236,14 @@ final class DocumentCrudController extends AbstractCrudController
         }
 
         $entity = $context->getEntity();
-        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
+        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getUuid());
 
         foreach ($entities as $key => $revision) {
             $entities[$key]->edit = $this
                 ->adminUrlGenerator
                 ->setController(DocumentCrudController::class)
                 ->setAction(Crud::PAGE_EDIT)
-                ->set('fileId', sprintf('%s-%s', $entity->getInstance()->getId(), $revision->getRev()));
+                ->set('fileId', $entity->getInstance()->getUuid());
         }
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([

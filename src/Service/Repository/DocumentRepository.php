@@ -49,7 +49,7 @@ final class DocumentRepository implements ObjectRepository
 
     public function deleteLock(Document $document): bool
     {
-        return $this->documentLockManager->deleteLock((string) $document->getId(), $this->request);
+        return $this->documentLockManager->deleteLock((string) $document->getUuid(), $this->request);
     }
 
     public function find($id): ?Document
@@ -78,43 +78,23 @@ final class DocumentRepository implements ObjectRepository
 
     public function findFromFileId(string $fileId): ?Document
     {
-        if (false === strpos($fileId, '-', 0)) {
-            $fileId .= '-0';
-        }
-
-        [$documentId, $documentRevisionId] = explode('-', $fileId, 2);
-
-        if (0 === $documentRevisionId) {
-            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
-        }
-
-        return $this->find($documentId);
+        return $this->findOneBy(['uuid' => $fileId]);
     }
 
-    public function findOneBy(array $criteria): ?Document
+    public function findLatestRevisionFromFileId(string $fileId): ?Revision
     {
-        return $this->repository->findOneBy($criteria);
-    }
-
-    public function findRevisionFromFileId(string $fileId): ?Revision
-    {
-        if (false === strpos($fileId, '-', 0)) {
-            $fileId .= '-0';
-        }
-
-        [$documentId, $documentRevisionId] = explode('-', $fileId, 2);
-
-        if (0 === $documentRevisionId) {
-            $documentRevisionId = $this->auditReader->getCurrentRevision(Document::class, $documentId);
-        }
-
         try {
-            $revision = $this->auditReader->findRevision($documentRevisionId);
+            $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(Document::class, $this->findOneBy(['uuid' => $fileId])->getId()));
         } catch (Throwable $e) {
             return null;
         }
 
         return $revision;
+    }
+
+    public function findOneBy(array $criteria): ?Document
+    {
+        return $this->repository->findOneBy($criteria);
     }
 
     public function getClassName(): string
@@ -124,17 +104,22 @@ final class DocumentRepository implements ObjectRepository
 
     public function getLock(Document $document): string
     {
-        return $this->documentLockManager->getLock((string) $document->getId(), $this->request);
+        return $this->documentLockManager->getLock((string) $document->getUuid(), $this->request);
+    }
+
+    public function getVersion(Document $document): int
+    {
+        return (int) $this->findLatestRevisionFromFileId((string) $document->getUuid())->getRev();
     }
 
     public function hasLock(Document $document): bool
     {
-        return $this->documentLockManager->hasLock((string) $document->getId(), $this->request);
+        return $this->documentLockManager->hasLock((string) $document->getUuid(), $this->request);
     }
 
     public function lock(Document $document, string $lockId): bool
     {
-        return $this->documentLockManager->setLock((string) $document->getId(), $lockId, $this->request);
+        return $this->documentLockManager->setLock((string) $document->getUuid(), $lockId, $this->request);
     }
 
     public function remove(Document $document): void

@@ -17,7 +17,6 @@ use loophp\psr17\Psr17Interface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
-use SimpleThings\EntityAudit\AuditReader;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
 
@@ -25,8 +24,6 @@ use function strlen;
 
 final class Wopi implements WopiInterface
 {
-    private AuditReader $auditReader;
-
     private CacheItemPoolInterface $cache;
 
     private DocumentRepository $documentRepository;
@@ -38,14 +35,12 @@ final class Wopi implements WopiInterface
     private Security $security;
 
     public function __construct(
-        AuditReader $auditReader,
         DocumentRepository $documentRepository,
         Psr17Interface $psr17,
         CacheItemPoolInterface $cache,
         RouterInterface $routerInterface,
         Security $security
     ) {
-        $this->auditReader = $auditReader;
         $this->documentRepository = $documentRepository;
         $this->psr17 = $psr17;
         $this->cache = $cache;
@@ -59,7 +54,8 @@ final class Wopi implements WopiInterface
         RequestInterface $request
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findRevisionFromFileId($fileId);
+        $revision = $this->documentRepository->findLatestRevisionFromFileId($fileId);
+
         $user = $this->security->getUser();
 
         if ($document->getShare()->isEmpty()) {
@@ -139,7 +135,7 @@ final class Wopi implements WopiInterface
     public function getFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
         $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findRevisionFromFileId($fileId);
+        $revision = $this->documentRepository->findLatestRevisionFromFileId($fileId);
 
         $content = (null === $contentResource = $document->getContent()) ?
             $this->psr17->createStream('') :
@@ -216,22 +212,21 @@ final class Wopi implements WopiInterface
         RequestInterface $request
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findRevisionFromFileId($fileId);
+        $version = $this->documentRepository->getVersion($document);
 
         if ($this->documentRepository->hasLock($document)) {
             if ($xWopiLock === $currentLock = $this->documentRepository->getLock($document)) {
                 return $this->refreshLock($fileId, $accessToken, $xWopiLock, $request);
             }
 
-            $revision = $this
-                ->auditReader
-                ->findRevision($this->auditReader->getCurrentRevision(Document::class, $document->getId()));
-
             return $this
                 ->psr17
                 ->createResponse(409)
                 ->withHeader('X-WOPI-Lock', $currentLock)
-                ->withHeader('X-WOPI-ItemVersion', 'v' . $revision->getRev());
+                ->withHeader(
+                    'X-WOPI-ItemVersion',
+                    sprintf('v%s', $version)
+                );
         }
 
         $this->documentRepository->lock($document, $xWopiLock);
@@ -241,7 +236,7 @@ final class Wopi implements WopiInterface
             ->createResponse()
             ->withHeader(
                 'X-WOPI-ItemVersion',
-                sprintf('v%s', $revision->getRev())
+                sprintf('v%s', $version)
             );
     }
 
@@ -253,7 +248,7 @@ final class Wopi implements WopiInterface
         RequestInterface $request
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findRevisionFromFileId($fileId);
+        $version = $this->documentRepository->getVersion($document);
 
         // File is unlocked
         if (false === $this->documentRepository->hasLock($document)) {
@@ -263,7 +258,7 @@ final class Wopi implements WopiInterface
                     ->createResponse(409)
                     ->withHeader(
                         'X-WOPI-ItemVersion',
-                        sprintf('v%s', $revision->getRev())
+                        sprintf('v%s', $version)
                     );
             }
         }
@@ -280,7 +275,7 @@ final class Wopi implements WopiInterface
                     )
                     ->withHeader(
                         'X-WOPI-ItemVersion',
-                        sprintf('v%s', $revision->getRev())
+                        sprintf('v%s', $version)
                     );
             }
         }
@@ -291,6 +286,7 @@ final class Wopi implements WopiInterface
         $document->setSize((string) strlen($body));
 
         $this->documentRepository->add($document);
+        $version = $this->documentRepository->getVersion($document);
 
         return $this
             ->psr17
@@ -301,7 +297,7 @@ final class Wopi implements WopiInterface
             )
             ->withHeader(
                 'X-WOPI-ItemVersion',
-                sprintf('v%s', $this->auditReader->getCurrentRevision(Document::class, $document->getId()))
+                sprintf('v%s', $version)
             );
     }
 
@@ -368,7 +364,7 @@ final class Wopi implements WopiInterface
                     ->generate(
                         'checkFileInfo',
                         [
-                            'fileId' => sprintf('%s-%s', $new->getId(), $this->auditReader->getCurrentRevision(Document::class, $new->getId())),
+                            'fileId' => $new->getUuid(),
                         ],
                         RouterInterface::ABSOLUTE_URL
                     )
@@ -446,7 +442,7 @@ final class Wopi implements WopiInterface
         RequestInterface $request
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findRevisionFromFileId($fileId);
+        $version = $this->documentRepository->getVersion($document);
 
         if (!$this->documentRepository->hasLock($document)) {
             return $this
@@ -472,7 +468,7 @@ final class Wopi implements WopiInterface
             ->withHeader('X-WOPI-Lock', '')
             ->withHeader(
                 'X-WOPI-ItemVersion',
-                sprintf('v%s', $revision->getRev())
+                sprintf('v%s', $version)
             );
     }
 
