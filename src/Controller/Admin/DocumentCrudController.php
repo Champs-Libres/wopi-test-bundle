@@ -120,15 +120,10 @@ final class DocumentCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        yield IdField::new('id')
-            ->hideWhenCreating()
-            ->hideWhenUpdating();
-
-        yield TextField::new('filename')
-            ->onlyOnIndex();
+        yield TextField::new('filename');
 
         yield TextField::new('name')
-            ->setLabel('Filename');
+            ->setLabel('Name');
 
         yield TextField::new('extension');
 
@@ -164,7 +159,7 @@ final class DocumentCrudController extends AbstractCrudController
             throw new Exception('Unsupported extension.');
         }
 
-        $configuration['access_token'] = $this->jwtManager->create($this->security->getUser());
+        $configuration['access_token'] = $this->jwtManager->createFromPayload($this->security->getUser(), ['fileUuid' => $document->getUuid()]);
         $configuration['server'] = $this
             ->psr17
             ->createUri($discoverExtension[0]['urlsrc'])
