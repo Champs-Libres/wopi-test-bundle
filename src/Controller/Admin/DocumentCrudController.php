@@ -47,205 +47,214 @@ use Symfony\Component\Security\Core\Security;
 
 final class DocumentCrudController extends AbstractCrudController
 {
-private AdminUrlGenerator $adminUrlGenerator;
+    private AdminUrlGenerator $adminUrlGenerator;
 
-private AuditReader $auditReader;
+    private AuditReader $auditReader;
 
-private DocumentRepository $documentRepository;
+    private DocumentRepository $documentRepository;
 
-private JWTManager $jwtManager;
+    private JWTManager $jwtManager;
 
-private Psr17Interface $psr17;
+    private Psr17Interface $psr17;
 
-private RouterInterface $router;
+    private RouterInterface $router;
 
-private Security $security;
+    private Security $security;
 
-private WopiConfigurationInterface $wopiConfiguration;
+    private WopiConfigurationInterface $wopiConfiguration;
 
-private WopiDiscoveryInterface $wopiDiscovery;
+    private WopiDiscoveryInterface $wopiDiscovery;
 
-public function __construct(
-    WopiConfigurationInterface $wopiConfiguration,
-    WopiDiscoveryInterface $wopiDiscovery,
-    RouterInterface $router,
-    Psr17Interface $psr17,
-    AuditReader $auditReader,
-    Security $security,
-    AdminUrlGenerator $adminUrlGenerator,
-    JWTTokenManagerInterface $jwtManager,
-    DocumentRepository $documentRepository
-) {
-    $this->wopiConfiguration = $wopiConfiguration;
-    $this->wopiDiscovery = $wopiDiscovery;
-    $this->router = $router;
-    $this->psr17 = $psr17;
-    $this->auditReader = $auditReader;
-    $this->security = $security;
-    $this->adminUrlGenerator = $adminUrlGenerator;
-    $this->jwtManager = $jwtManager;
-    $this->documentRepository = $documentRepository;
-}
-
-public function configureActions(Actions $actions): Actions
-{
-    $unlockDocument = Action::new('unlock', 'Unlock')
-        ->linkToCrudAction('unlockDocument')
-        ->displayIf(fn (Document $document): bool => $this->documentRepository->hasLock($document));
-
-    $showHistory = Action::new('history', 'History')
-        ->linkToCrudAction('showHistory');
-
-    return $actions
-        ->addBatchAction(
-            Action::new('unlockDocuments', 'Unlock')
-                ->linkToCrudAction('unlockDocuments')
-                ->addCssClass('btn btn-primary')
-                ->setIcon('fa fa-unlock')
-        )
-        ->add(Crud::PAGE_INDEX, Action::DETAIL)
-        ->add(
-            Crud::PAGE_INDEX,
-            $unlockDocument
-        )
-        ->add(
-            Crud::PAGE_INDEX,
-            $showHistory
-        )
-        ->add(Crud::PAGE_EDIT, Action::INDEX)
-        ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
-        ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
-        ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
-}
-
-public function configureFields(string $pageName): iterable
-{
-    yield IdField::new('id')
-        ->hideWhenCreating()
-        ->hideWhenUpdating();
-
-    yield TextField::new('filename')
-        ->onlyOnIndex();
-
-    yield TextField::new('name')
-        ->setLabel('Filename');
-
-    yield TextField::new('extension');
-
-    yield IntegerField::new('size')
-        ->hideWhenCreating()
-        ->hideWhenUpdating();
-
-    yield WopiDocumentRevisionField::new('id');
-
-    yield WopiDocumentRevisionTimestampField::new('id');
-
-    yield WopiDocumentLockField::new('id')
-        ->setTemplatePath('@WopiTest/fields/lock.html.twig')
-        ->setSortable(false);
-}
-
-public function edit(AdminContext $context)
-{
-    $documentId = $context->getEntity()->getInstance()->getId();
-    $documentRevision = $context->getRequest()->query->get('revision');
-
-    if (null === $documentRevision) {
-        $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+    public function __construct(
+        WopiConfigurationInterface $wopiConfiguration,
+        WopiDiscoveryInterface $wopiDiscovery,
+        RouterInterface $router,
+        Psr17Interface $psr17,
+        AuditReader $auditReader,
+        Security $security,
+        AdminUrlGenerator $adminUrlGenerator,
+        JWTTokenManagerInterface $jwtManager,
+        DocumentRepository $documentRepository
+    ) {
+        $this->wopiConfiguration = $wopiConfiguration;
+        $this->wopiDiscovery = $wopiDiscovery;
+        $this->router = $router;
+        $this->psr17 = $psr17;
+        $this->auditReader = $auditReader;
+        $this->security = $security;
+        $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->jwtManager = $jwtManager;
+        $this->documentRepository = $documentRepository;
     }
 
-    /** @var Document $document */
-    $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
+    public function configureActions(Actions $actions): Actions
+    {
+        $unlockDocument = Action::new('unlock', 'Unlock')
+            ->linkToCrudAction('unlockDocument')
+            ->displayIf(fn (Document $document): bool => $this->documentRepository->hasLock($document));
 
-    $extension = $document->getExtension();
-    $configuration = $this->wopiConfiguration->jsonSerialize();
+        $showHistory = Action::new('history', 'History')
+            ->linkToCrudAction('showHistory');
 
-    if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension, 'edit')) {
-        throw new Exception('Unsupported extension.');
-    }
-
-    $configuration['access_token'] = $this->jwtManager->create($this->security->getUser());
-    $configuration['server'] = $this
-        ->psr17
-        ->createUri($discoverExtension[0]['urlsrc'])
-        ->withQuery(
-            http_build_query(
-                [
-                    'WOPISrc' => $this
-                        ->router
-                        ->generate(
-                            'checkFileInfo',
-                            [
-                                'fileId' => $document->getUuid(),
-                            ],
-                            UrlGeneratorInterface::ABSOLUTE_URL
-                        ),                    ]
+        return $actions
+            ->addBatchAction(
+                Action::new('unlockDocuments', 'Unlock')
+                    ->linkToCrudAction('unlockDocuments')
+                    ->addCssClass('btn btn-primary')
+                    ->setIcon('fa fa-unlock')
             )
-        );
-
-    $this->get(EntityFactory::class)->processActions($context->getEntity(), $context->getCrud()->getActionsConfig());
-
-    $responseParameters = $this->configureResponseParameters(KeyValueStore::new(array_merge(
-        $configuration,
-        [
-            'pageName' => Crud::PAGE_EDIT,
-            'templatePath' => '@WopiTest/editor.html.twig',
-            'entity' => $context->getEntity(),
-        ]
-    )));
-
-    $event = new AfterCrudActionEvent($context, $responseParameters);
-    $this->get('event_dispatcher')->dispatch($event);
-
-    if ($event->isPropagationStopped()) {
-        return $event->getResponse();
+            ->add(Crud::PAGE_INDEX, Action::DETAIL)
+            ->add(
+                Crud::PAGE_INDEX,
+                $unlockDocument
+            )
+            ->add(
+                Crud::PAGE_INDEX,
+                $showHistory
+            )
+            ->add(Crud::PAGE_EDIT, Action::INDEX)
+            ->remove(Crud::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
+            ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_CONTINUE)
+            ->remove(Crud::PAGE_EDIT, Action::SAVE_AND_RETURN);
     }
 
-    return $responseParameters;
-}
+    public function configureFields(string $pageName): iterable
+    {
+        yield IdField::new('id')
+            ->hideWhenCreating()
+            ->hideWhenUpdating();
 
-public static function getEntityFqcn(): string
-{
-    return Document::class;
-}
+        yield TextField::new('filename')
+            ->onlyOnIndex();
 
-public function showHistory(AdminContext $context)
-{
-    $event = new BeforeCrudActionEvent($context);
-    $this->get('event_dispatcher')->dispatch($event);
+        yield TextField::new('name')
+            ->setLabel('Filename');
 
-    if ($event->isPropagationStopped()) {
-        return $event->getResponse();
+        yield TextField::new('extension');
+
+        yield IntegerField::new('size')
+            ->hideWhenCreating()
+            ->hideWhenUpdating();
+
+        yield WopiDocumentRevisionField::new('id');
+
+        yield WopiDocumentRevisionTimestampField::new('id');
+
+        yield WopiDocumentLockField::new('id')
+            ->setTemplatePath('@WopiTest/fields/lock.html.twig')
+            ->setSortable(false);
     }
 
-    if (!$this->isGranted(Permission::EA_EXECUTE_ACTION, ['action' => Action::INDEX, 'entity' => null])) {
-        throw new ForbiddenActionException($context);
+    public function edit(AdminContext $context)
+    {
+        $documentId = $context->getEntity()->getInstance()->getId();
+        $documentRevision = $context->getRequest()->query->get('revision');
+
+        if (null === $documentRevision) {
+            $documentRevision = $this->auditReader->getCurrentRevision(Document::class, $documentId);
+        }
+
+        /** @var Document $document */
+        $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
+
+        $extension = $document->getExtension();
+        $configuration = $this->wopiConfiguration->jsonSerialize();
+
+        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension, 'edit')) {
+            throw new Exception('Unsupported extension.');
+        }
+
+        $configuration['access_token'] = $this->jwtManager->create($this->security->getUser());
+        $configuration['server'] = $this
+            ->psr17
+            ->createUri($discoverExtension[0]['urlsrc'])
+            ->withQuery(
+                http_build_query(
+                    [
+                        'WOPISrc' => $this
+                            ->router
+                            ->generate(
+                                'checkFileInfo',
+                                [
+                                    'fileId' => $document->getUuid(),
+                                ],
+                                UrlGeneratorInterface::ABSOLUTE_URL
+                            ),                    ]
+                )
+            );
+
+        $this->get(EntityFactory::class)->processActions($context->getEntity(), $context->getCrud()->getActionsConfig());
+
+        $responseParameters = $this->configureResponseParameters(KeyValueStore::new(array_merge(
+            $configuration,
+            [
+                'pageName' => Crud::PAGE_EDIT,
+                'templatePath' => '@WopiTest/editor.html.twig',
+                'entity' => $context->getEntity(),
+            ]
+        )));
+
+        $event = new AfterCrudActionEvent($context, $responseParameters);
+        $this->get('event_dispatcher')->dispatch($event);
+
+        if ($event->isPropagationStopped()) {
+            return $event->getResponse();
+        }
+
+        return $responseParameters;
     }
 
-    $fields = FieldCollection::new($this->configureFields(Crud::PAGE_INDEX));
-    $filters = $this->get(FilterFactory::class)->create($context->getCrud()->getFiltersConfig(), $fields, $context->getEntity());
-    $queryBuilder = $this->createIndexQueryBuilder($context->getSearch(), $context->getEntity(), $fields, $filters);
-    $paginator = $this->get(PaginatorFactory::class)->create($queryBuilder);
+    public static function getEntityFqcn(): string
+    {
+        return Document::class;
+    }
 
-    // this can happen after deleting some items and trying to return
-    // to a 'index' page that no longer exists. Redirect to the last page instead
-    if ($paginator->isOutOfRange()) {
-        return $this->redirect($this->get(AdminUrlGenerator::class)
-            ->set(EA::PAGE, $paginator->getLastPage())
-            ->generateUrl());
+    public function showHistory(AdminContext $context)
+    {
+        $event = new BeforeCrudActionEvent($context);
+        $this->get('event_dispatcher')->dispatch($event);
 
-        $entityps = $context->getEntity();
-        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
+        if ($event->isPropagationStopped()) {
+            return $event->getResponse();
+        }
+
+        if (!$this->isGranted(Permission::EA_EXECUTE_ACTION, ['action' => Action::INDEX, 'entity' => null])) {
+            throw new ForbiddenActionException($context);
+        }
+
+        $fields = FieldCollection::new($this->configureFields(Crud::PAGE_INDEX));
+        $filters = $this->get(FilterFactory::class)->create($context->getCrud()->getFiltersConfig(), $fields, $context->getEntity());
+        $queryBuilder = $this->createIndexQueryBuilder($context->getSearch(), $context->getEntity(), $fields, $filters);
+        $paginator = $this->get(PaginatorFactory::class)->create($queryBuilder);
+
+        // this can happen after deleting some items and trying to return
+        // to a 'index' page that no longer exists. Redirect to the last page instead
+        if ($paginator->isOutOfRange()) {
+            return $this->redirect($this->get(AdminUrlGenerator::class)
+                ->set(EA::PAGE, $paginator->getLastPage())
+                ->generateUrl());
+        }
+
+        $entity = $context->getEntity();
+        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getUuid());
+
+        foreach ($entities as $key => $revision) {
+            $entities[$key]->edit = $this
+                ->adminUrlGenerator
+                ->setController(DocumentCrudController::class)
+                ->setAction(Crud::PAGE_EDIT)
+                ->set('fileId', $entity->getInstance()->getUuid());
+        }
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
-        'revisions' => $entities,
-        'entity' => $entity,
-        'batch_actions' => [],
-        'filters' => [],
-        'global_actions' => [],
-        'paginator' => $paginator,
-        'pageName' => Crud::PAGE_DETAIL,
-        'templatePath' => '@WopiTest/history.html.twig',
+            'revisions' => $entities,
+            'entity' => $entity,
+            'batch_actions' => [],
+            'filters' => [],
+            'global_actions' => [],
+            'paginator' => $paginator,
+            'pageName' => Crud::PAGE_DETAIL,
+            'templatePath' => '@WopiTest/history.html.twig',
         ]));
 
         $event = new AfterCrudActionEvent($context, $responseParameters);

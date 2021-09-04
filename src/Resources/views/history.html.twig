@@ -30,6 +30,7 @@
             <th>ID</th>
             <th>User</th>
             <th>Date</th>
+            <th>Edit</th>
             </tr>
         </thead>
 
@@ -45,6 +46,7 @@
                 <td>{{ revision.rev }}</td>
                 <td>{{ revision.username|default('unknown_user'|trans({}, 'EasyAdminBundle')) }}</td>
                 <td><time datetime="{{ revision.timestamp|date('c') }}" title="{{ revision.timestamp|date('r') }}">{{ revision.timestamp|date('c') }}</time></td>
+                <td><a href="{{ editUrl }}">Edit this version</a></td>
             </tr>
         {% endfor %}
     </table>
