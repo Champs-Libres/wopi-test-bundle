@@ -29,6 +29,13 @@ final class Security extends AbstractController
             'error' => $error,
             'last_username' => $lastUsername,
 
+            // whether to enable or not the "remember me" checkbox (default: false)
+            'remember_me_enabled' => true,
+            // whether to check by default the "remember me" checkbox (default: false)
+            'remember_me_checked' => true,
+            // the label displayed for the remember me checkbox (the |trans filter is applied to it)
+            'remember_me_label' => 'Remember me',
+
             // OPTIONAL parameters to customize the login form:
 
             // the translation_domain to use (define this option only if you are
