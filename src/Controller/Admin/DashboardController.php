@@ -45,6 +45,8 @@ final class DashboardController extends AbstractDashboardController
 
         yield MenuItem::linkToRoute('Capabilities', 'fas fa-info', 'hosting_capabilities');
 
+        yield MenuItem::linkToRoute('Proof key', 'fas fa-info', 'proof_key');
+
         yield MenuItem::section('WOPI Validator');
 
         yield MenuItem::linkToRoute('Tests', 'fas fa-info', 'wopi_test');
