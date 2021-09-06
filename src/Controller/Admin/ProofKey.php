@@ -21,7 +21,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Contracts\Controller\DashboardControllerInte
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Throwable;
 
 final class ProofKey implements DashboardControllerInterface
 {
@@ -39,22 +38,6 @@ final class ProofKey implements DashboardControllerInterface
         $this->wopiDiscovery = $wopiDiscovery;
         $this->responder = $responder;
         $this->dashboardController = $dashboardController;
-    }
-
-    /**
-     * @Route(path="proof_key", name="proof_key")
-     */
-    public function proofKey(): Response
-    {
-        return $this
-            ->responder
-            ->render(
-                '@WopiTest/proof-key.html.twig',
-                [
-                    'publicKey' => $this->wopiDiscovery->getPublicKey(),
-                    'publicKeyOld' => $this->wopiDiscovery->getPublicKeyOld(),
-                ]
-            );
     }
 
     public function configureActions(): Actions
@@ -95,5 +78,21 @@ final class ProofKey implements DashboardControllerInterface
     public function index(): Response
     {
         return $this->dashboardController->index();
+    }
+
+    /**
+     * @Route(path="proof_key", name="proof_key")
+     */
+    public function proofKey(): Response
+    {
+        return $this
+            ->responder
+            ->render(
+                '@WopiTest/proof-key.html.twig',
+                [
+                    'publicKey' => $this->wopiDiscovery->getPublicKey(),
+                    'publicKeyOld' => $this->wopiDiscovery->getPublicKeyOld(),
+                ]
+            );
     }
 }

@@ -31,7 +31,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Exception\ForbiddenActionException;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\EntityFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\FilterFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\PaginatorFactory;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
@@ -47,8 +46,6 @@ use Symfony\Component\Security\Core\Security;
 
 final class DocumentCrudController extends AbstractCrudController
 {
-    private AdminUrlGenerator $adminUrlGenerator;
-
     private AuditReader $auditReader;
 
     private DocumentRepository $documentRepository;
@@ -72,7 +69,6 @@ final class DocumentCrudController extends AbstractCrudController
         Psr17Interface $psr17,
         AuditReader $auditReader,
         Security $security,
-        AdminUrlGenerator $adminUrlGenerator,
         JWTTokenManagerInterface $jwtManager,
         DocumentRepository $documentRepository
     ) {
@@ -82,7 +78,6 @@ final class DocumentCrudController extends AbstractCrudController
         $this->psr17 = $psr17;
         $this->auditReader = $auditReader;
         $this->security = $security;
-        $this->adminUrlGenerator = $adminUrlGenerator;
         $this->jwtManager = $jwtManager;
         $this->documentRepository = $documentRepository;
     }
@@ -120,7 +115,8 @@ final class DocumentCrudController extends AbstractCrudController
 
     public function configureFields(string $pageName): iterable
     {
-        yield TextField::new('filename');
+        yield TextField::new('filename')
+            ->onlyOnIndex();
 
         yield TextField::new('name')
             ->setLabel('Name');
@@ -155,7 +151,7 @@ final class DocumentCrudController extends AbstractCrudController
         $extension = $document->getExtension();
         $configuration = $this->wopiConfiguration->jsonSerialize();
 
-        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension, 'edit')) {
+        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension)) {
             throw new Exception('Unsupported extension.');
         }
 
