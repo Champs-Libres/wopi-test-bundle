@@ -46,20 +46,13 @@ final class ProofKey implements DashboardControllerInterface
      */
     public function proofKey(): Response
     {
-        try {
-            $proofKey = $this->wopiDiscovery->getPublicKey();
-        } catch (Throwable $e) {
-            $proofKey = [
-                'error' => $e->getMessage(),
-            ];
-        }
-
         return $this
             ->responder
             ->render(
                 '@WopiTest/proof-key.html.twig',
                 [
-                    'proofKey' => $proofKey,
+                    'publicKey' => $this->wopiDiscovery->getPublicKey(),
+                    'publicKeyOld' => $this->wopiDiscovery->getPublicKeyOld(),
                 ]
             );
     }
