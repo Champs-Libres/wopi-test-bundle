@@ -19,13 +19,13 @@ This bundle also depends on <a href="https://github.com/champs-libres/wopi-lib">
 a standard and framework agnostic PHP library to facilitate the implementation of the <a href="https://wopi.readthedocs.io/">WOPI protocol</a> in PHP.
 <br/>
 <br/>
-<a href="{{ path('admin_wopi') }}">Click here</a> to access the application.
-You must be logged in to <i>play</i> with the application, the default login is: <code>{{ user }}</code> and the default password is <code>{{ user }}</code>.
+<a href="{{ path('admin_wopi') }}">Click here</a> to launch the application.
+You must be logged in to <i>play</i> with it, the default login is: <code>{{ user }}</code> and the default password is <code>{{ user }}</code>.
 <br/>
-You can create and edit documents, you can also collaborate on them.
+You can create, edit and delete documents, you can also collaborate when multiple users are connected to the same document.
 <br/>
 <br/>
-The Symfony Profiler is accessible <i>on purpose</i> so you can see the requests and responses made by the WOPI client.
+The <a href="https://symfony.com/doc/current/profiler.html">Symfony Profiler</a> is enabled <i>on purpose</i> so you can see the requests and responses made by the WOPI client.
 <br/>
 The SQLite database behind this project is committed to the git repository and thus reset at each deployment.
 
