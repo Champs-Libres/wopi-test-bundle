@@ -64,6 +64,6 @@ final class DashboardController extends AbstractDashboardController
      */
     public function index(): Response
     {
-        return $this->render('@WopiTest/welcome.html.twig');
+        return $this->render('@WopiTest/homepage.html.twig');
     }
 }
