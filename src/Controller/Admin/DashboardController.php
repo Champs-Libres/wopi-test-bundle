@@ -24,7 +24,7 @@ final class DashboardController extends AbstractDashboardController
     public function configureDashboard(): Dashboard
     {
         return Dashboard::new()
-            ->setTitle('WOPI Bundle admin')
+            ->setTitle('WOPI App')
             ->renderContentMaximized()
             ->renderSidebarMinimized(true);
     }

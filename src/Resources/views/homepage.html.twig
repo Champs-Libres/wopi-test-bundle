@@ -1,0 +1,40 @@
+{# @var ea \EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext #}
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}
+    Welcome to WOPI-APP!
+{% endblock %}
+
+{% block main %}
+<h2>What is this?</h2>
+
+What you see here is the
+<a href="https://github.com/champs-libres/wopi-test-bundle">champs-libres/wopi-test-bundle</a>,
+a demo bundle for the <a href="https://github.com/champs-libres/wopi-bundle">champs-libres/wopi-bundle</a>
+package for Symfony which provides routes and glue code between Symfony and a
+<a href="https://wopi.readthedocs.io/">WOPI</a> connector.
+<br/>
+<br/>
+This bundle also depends on <a href="https://github.com/champs-libres/wopi-lib">champs-libres/wopi-lib</a>,
+a standard and framework agnostic PHP library to facilitate the implementation of the <a href="https://wopi.readthedocs.io/">WOPI protocol</a> in PHP.
+<br/>
+<br/>
+<a href="{{ path('admin_wopi') }}">Click here</a> to access the application.
+You must be logged in to <i>play</i> with the application, the default login is: <code>{{ user }}</code> and the default password is <code>{{ user }}</code>.
+<br/>
+You can create and edit documents, you can also collaborate on them.
+<br/>
+<br/>
+The Symfony Profiler is accessible <i>on purpose</i> so you can see the requests and responses made by the WOPI client.
+<br/>
+The SQLite database behind this project is committed to the git repository and thus reset at each deployment.
+
+<h2>Who are we?</h2>
+
+We are a team developers based in Belgium.
+
+<h2>Questions?</h2>
+
+Find us at <a href="https://www.champs-libres.coop">https://www.champs-libres.coop</a>
+
+{% endblock %}
