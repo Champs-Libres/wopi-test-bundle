@@ -21,7 +21,8 @@ final class RelaxWopiProofValidator implements WopiProofValidatorInterface
         $this->wopiProofValidator = $wopiProofValidator;
     }
 
-    public function isValid(RequestInterface $request): bool {
+    public function isValid(RequestInterface $request): bool
+    {
         if (true === $request->hasHeader('X-WOPI-Proof') && true === $request->hasHeader('X-WOPI-ProofOld')) {
             return $this->wopiProofValidator->isValid(($request));
         }

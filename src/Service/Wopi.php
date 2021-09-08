@@ -323,7 +323,7 @@ final class Wopi implements WopiInterface
 
         if ($request->hasHeader('X-WOPI-RelativeTarget')) {
             $overwriteRelativeTarget = $request->hasHeader('X-WOPI-OverwriteRelativeTarget') ?
-                strtolower($request->getHeaderLine('X-WOPI-OverwriteRelativeTarget')):
+                strtolower($request->getHeaderLine('X-WOPI-OverwriteRelativeTarget')) :
                 'false';
 
             $overwriteRelativeTarget = 'false' === $overwriteRelativeTarget ? false : true;
@@ -332,7 +332,7 @@ final class Wopi implements WopiInterface
 
             $relativeTargetPathInfo = pathinfo($relativeTarget);
 
-            /** @var null|Document $document */
+            /** @var Document|null $document */
             $document = $this->documentRepository->findOneBy([
                 'name' => $relativeTargetPathInfo['filename'],
                 'extension' => $relativeTargetPathInfo['extension'],
@@ -352,7 +352,7 @@ final class Wopi implements WopiInterface
              * X-WOPI-Lock response header containing the value of the current lock on the file.
              */
             if (null !== $document) {
-                if (false === $overwriteRelativeTarget ) {
+                if (false === $overwriteRelativeTarget) {
                     return $this
                         ->psr17
                         ->createResponse(409)
