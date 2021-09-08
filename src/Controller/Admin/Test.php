@@ -110,6 +110,16 @@ final class Test implements DashboardControllerInterface
      */
     public function test(): Response
     {
+        foreach ($this->documentRepository->findBy(['extension' => 'wopitest']) as $document) {
+            $this->entityManager->remove($document);
+        }
+
+        foreach ($this->documentRepository->findBy(['extension' => 'wopitestx']) as $document) {
+            $this->entityManager->remove($document);
+        }
+
+        $this->entityManager->flush();
+
         $document = $this->documentRepository->findOneBy([
             'extension' => 'wopitest',
             'size' => '0',
