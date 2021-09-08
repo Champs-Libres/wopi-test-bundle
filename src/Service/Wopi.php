@@ -455,9 +455,17 @@ final class Wopi implements WopiInterface
         $document->setName($xWopiRequestedName);
         $this->documentRepository->add($document);
 
+        $data = [
+            'Name' => $xWopiRequestedName,
+        ];
+
         return $this
             ->psr17
-            ->createResponse(200);
+            ->createResponse(200)
+            ->withHeader('Content-Type', 'application/json')
+            ->withBody(
+                $this->psr17->createStream((string) json_encode($data))
+            );
     }
 
     public function unlock(
