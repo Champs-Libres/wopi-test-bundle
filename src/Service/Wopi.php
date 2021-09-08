@@ -303,6 +303,12 @@ final class Wopi implements WopiInterface
 
     public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
+        if ($request->hasHeader('X-WOPI-SuggestedTarget') && $request->hasHeader('X-WOPI-RelativeTarget')) {
+            return $this
+                ->psr17
+                ->createResponse(400);
+        }
+
         if ($request->hasHeader('X-WOPI-SuggestedTarget')) {
             $suggestedTarget = $request->getHeaderLine('X-WOPI-SuggestedTarget');
 
@@ -316,30 +322,49 @@ final class Wopi implements WopiInterface
         }
 
         if ($request->hasHeader('X-WOPI-RelativeTarget')) {
-            $overwriteRelativeTarget = 'false';
+            $overwriteRelativeTarget = $request->hasHeader('X-WOPI-OverwriteRelativeTarget') ?
+                strtolower($request->getHeaderLine('X-WOPI-OverwriteRelativeTarget')):
+                'false';
 
-            if ($request->hasHeader('X-WOPI-OverwriteRelativeTarget')) {
-                $overwriteRelativeTarget = $request->getHeaderLine('X-WOPI-OverwriteRelativeTarget');
-            }
             $overwriteRelativeTarget = 'false' === $overwriteRelativeTarget ? false : true;
 
             $relativeTarget = $request->getHeaderLine('X-WOPI-RelativeTarget');
 
-            // @ TODO does not work yet.
-            if (true === $overwriteRelativeTarget) {
-                $relativeTargetPathInfo = pathinfo($relativeTarget);
+            $relativeTargetPathInfo = pathinfo($relativeTarget);
 
-                $document = $this->documentRepository->findOneBy([
-                    'name' => $relativeTargetPathInfo['filename'],
-                    'extension' => $relativeTargetPathInfo['extension'],
-                ]);
+            /** @var null|Document $document */
+            $document = $this->documentRepository->findOneBy([
+                'name' => $relativeTargetPathInfo['filename'],
+                'extension' => $relativeTargetPathInfo['extension'],
+            ]);
 
-                if (null !== $document) {
+            /**
+             * If a file with the specified name already exists,
+             * the host must respond with a 409 Conflict,
+             * unless the X-WOPI-OverwriteRelativeTarget request header is set to true.
+             *
+             * When responding with a 409 Conflict for this reason,
+             * the host may include an X-WOPI-ValidRelativeTarget specifying a file name that is valid.
+             *
+             * If the X-WOPI-OverwriteRelativeTarget request header is set to true
+             * and a file with the specified name already exists and is locked,
+             * the host must respond with a 409 Conflict and include an
+             * X-WOPI-Lock response header containing the value of the current lock on the file.
+             */
+            if (null !== $document) {
+                if (false === $overwriteRelativeTarget ) {
                     return $this
                         ->psr17
                         ->createResponse(409)
                         ->withHeader('Content-Type', 'application/json')
                         ->withHeader('X-WOPI-ValidRelativeTarget', sprintf('%s.%s', uniqid(), $relativeTargetPathInfo['extension']));
+                }
+
+                if ($this->documentRepository->hasLock($document)) {
+                    return $this
+                        ->psr17
+                        ->createResponse(409)
+                        ->withHeader('X-WOPI-Lock', $this->documentRepository->getLock($document));
                 }
             }
 
@@ -352,7 +377,7 @@ final class Wopi implements WopiInterface
         $new->setName($pathInfo['filename']);
         $new->setExtension($pathInfo['extension']);
         $new->setContent((string) $request->getBody());
-        $new->setSize($request->getHeaderLine('content-length'));
+        $new->setSize($request->getHeaderLine('X-WOPI-Size'));
 
         $this->documentRepository->add($new);
 
