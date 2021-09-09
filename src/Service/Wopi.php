@@ -10,9 +10,12 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Service;
 
 use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
+use ChampsLibres\WopiTestBundle\Controller\Admin\DashboardController;
+use ChampsLibres\WopiTestBundle\Controller\Admin\DocumentCrudController;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\Share;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use loophp\psr17\Psr17Interface;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\RequestInterface;
@@ -24,6 +27,8 @@ use function strlen;
 
 final class Wopi implements WopiInterface
 {
+    private AdminUrlGenerator $adminUrlGenerator;
+
     private CacheItemPoolInterface $cache;
 
     private DocumentRepository $documentRepository;
@@ -35,12 +40,14 @@ final class Wopi implements WopiInterface
     private Security $security;
 
     public function __construct(
+        AdminUrlGenerator $adminUrlGenerator,
         DocumentRepository $documentRepository,
         Psr17Interface $psr17,
         CacheItemPoolInterface $cache,
         RouterInterface $routerInterface,
         Security $security
     ) {
+        $this->adminUrlGenerator = $adminUrlGenerator;
         $this->documentRepository = $documentRepository;
         $this->psr17 = $psr17;
         $this->cache = $cache;
@@ -301,17 +308,15 @@ final class Wopi implements WopiInterface
             );
     }
 
-    public function putRelativeFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
+    public function putRelativeFile(string $fileId, string $accessToken, ?string $suggestedTarget, ?string $relativeTarget, bool $overwriteRelativeTarget, int $size, RequestInterface $request): ResponseInterface
     {
-        if ($request->hasHeader('X-WOPI-SuggestedTarget') && $request->hasHeader('X-WOPI-RelativeTarget')) {
+        if (($suggestedTarget !== null) && ($relativeTarget !== null)) {
             return $this
                 ->psr17
                 ->createResponse(400);
         }
 
-        if ($request->hasHeader('X-WOPI-SuggestedTarget')) {
-            $suggestedTarget = $request->getHeaderLine('X-WOPI-SuggestedTarget');
-
+        if (null !== $suggestedTarget) {
             // If it starts with a dot...
             if (0 === strpos($suggestedTarget, '.', 0)) {
                 $document = $this->documentRepository->findFromFileId($fileId);
@@ -321,15 +326,7 @@ final class Wopi implements WopiInterface
             $target = $suggestedTarget;
         }
 
-        if ($request->hasHeader('X-WOPI-RelativeTarget')) {
-            $overwriteRelativeTarget = $request->hasHeader('X-WOPI-OverwriteRelativeTarget') ?
-                strtolower($request->getHeaderLine('X-WOPI-OverwriteRelativeTarget')) :
-                'false';
-
-            $overwriteRelativeTarget = 'false' === $overwriteRelativeTarget ? false : true;
-
-            $relativeTarget = $request->getHeaderLine('X-WOPI-RelativeTarget');
-
+        if (null !== $relativeTarget) {
             $relativeTargetPathInfo = pathinfo($relativeTarget);
 
             /** @var Document|null $document */
@@ -401,6 +398,20 @@ final class Wopi implements WopiInterface
         $properties = [
             'Name' => $new->getFilename(),
             'Url' => (string) $uri,
+            'HostEditUrl' => $this
+                ->adminUrlGenerator
+                ->setDashboard(DashboardController::class)
+                ->setAction('edit')
+                ->setController(DocumentCrudController::class)
+                ->setEntityId($new->getId())
+                ->generateUrl(),
+            'HostViewUrl' => $this
+                ->adminUrlGenerator
+                ->setDashboard(DashboardController::class)
+                ->setAction('detail')
+                ->setController(DocumentCrudController::class)
+                ->setEntityId($new->getId())
+                ->generateUrl(),
         ];
 
         return $this
