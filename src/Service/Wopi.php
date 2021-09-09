@@ -454,6 +454,12 @@ final class Wopi implements WopiInterface
     ): ResponseInterface {
         $document = $this->documentRepository->findFromFileId($fileId);
 
+        if (null === $document) {
+            return $this
+                ->psr17
+                ->createResponse(404);
+        }
+
         if ($this->documentRepository->hasLock($document)) {
             if ($xWopiLock !== $currentLock = $this->documentRepository->getLock($document)) {
                 return $this
