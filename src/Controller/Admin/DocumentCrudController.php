@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
-use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
-use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
+use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
+use ChampsLibres\WopiLib\Contract\Service\Discovery\DiscoveryInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
@@ -48,6 +48,10 @@ final class DocumentCrudController extends AbstractCrudController
 {
     private AuditReader $auditReader;
 
+    private ConfigurationInterface $configuration;
+
+    private DiscoveryInterface $discovery;
+
     private DocumentRepository $documentRepository;
 
     private JWTManager $jwtManager;
@@ -58,13 +62,9 @@ final class DocumentCrudController extends AbstractCrudController
 
     private Security $security;
 
-    private WopiConfigurationInterface $wopiConfiguration;
-
-    private WopiDiscoveryInterface $wopiDiscovery;
-
     public function __construct(
-        WopiConfigurationInterface $wopiConfiguration,
-        WopiDiscoveryInterface $wopiDiscovery,
+        ConfigurationInterface $configuration,
+        DiscoveryInterface $discovery,
         RouterInterface $router,
         Psr17Interface $psr17,
         AuditReader $auditReader,
@@ -72,8 +72,8 @@ final class DocumentCrudController extends AbstractCrudController
         JWTTokenManagerInterface $jwtManager,
         DocumentRepository $documentRepository
     ) {
-        $this->wopiConfiguration = $wopiConfiguration;
-        $this->wopiDiscovery = $wopiDiscovery;
+        $this->configuration = $configuration;
+        $this->discovery = $discovery;
         $this->router = $router;
         $this->psr17 = $psr17;
         $this->auditReader = $auditReader;
@@ -149,9 +149,9 @@ final class DocumentCrudController extends AbstractCrudController
         $document = $this->auditReader->find(Document::class, $documentId, $documentRevision);
 
         $extension = $document->getExtension();
-        $configuration = $this->wopiConfiguration->jsonSerialize();
+        $configuration = $this->configuration->jsonSerialize();
 
-        if ([] === $discoverExtension = $this->wopiDiscovery->discoverExtension($extension)) {
+        if ([] === $discoverExtension = $this->discovery->discoverExtension($extension)) {
             throw new Exception('Unsupported extension.');
         }
 

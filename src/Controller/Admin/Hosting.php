@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
-use ChampsLibres\WopiLib\Discovery\WopiDiscoveryInterface;
+use ChampsLibres\WopiLib\Contract\Service\Discovery\DiscoveryInterface;
 use ChampsLibres\WopiTestBundle\Service\Controller\ResponderInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
@@ -27,16 +27,16 @@ final class Hosting implements DashboardControllerInterface
 {
     private DashboardController $dashboardController;
 
+    private DiscoveryInterface $discovery;
+
     private ResponderInterface $responder;
 
-    private WopiDiscoveryInterface $wopiDiscovery;
-
     public function __construct(
-        WopiDiscoveryInterface $wopiDiscovery,
+        DiscoveryInterface $discovery,
         ResponderInterface $responder,
         DashboardController $dashboardController
     ) {
-        $this->wopiDiscovery = $wopiDiscovery;
+        $this->discovery = $discovery;
         $this->responder = $responder;
         $this->dashboardController = $dashboardController;
     }
@@ -47,7 +47,7 @@ final class Hosting implements DashboardControllerInterface
     public function capabilities(): Response
     {
         try {
-            $capabilities = $this->wopiDiscovery->getCapabilities();
+            $capabilities = $this->discovery->getCapabilities();
         } catch (Throwable $e) {
             $capabilities = [
                 'error' => $e->getMessage(),

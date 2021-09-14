@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Repository;
 
-use ChampsLibres\WopiLib\Service\Contract\DocumentLockManagerInterface;
+use ChampsLibres\WopiLib\Contract\Service\DocumentLockManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ObjectRepository;

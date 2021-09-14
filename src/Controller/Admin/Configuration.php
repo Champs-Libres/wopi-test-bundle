@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
-use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
+use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
 use ChampsLibres\WopiTestBundle\Form\Type\Configuration as FormTypeConfiguration;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -18,11 +18,11 @@ use Symfony\Component\Routing\Annotation\Route;
 
 final class Configuration extends AbstractController
 {
-    private WopiConfigurationInterface $wopiConfiguration;
+    private ConfigurationInterface $configuration;
 
-    public function __construct(WopiConfigurationInterface $wopiConfiguration)
+    public function __construct(ConfigurationInterface $configuration)
     {
-        $this->wopiConfiguration = $wopiConfiguration;
+        $this->configuration = $configuration;
     }
 
     /**
@@ -32,7 +32,7 @@ final class Configuration extends AbstractController
     {
         $form = $this->createForm(
             FormTypeConfiguration::class,
-            $this->wopiConfiguration->jsonSerialize()
+            $this->configuration->jsonSerialize()
         );
 
         $form->handleRequest($request);

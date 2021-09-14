@@ -9,18 +9,18 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Configuration;
 
-use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
+use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 use function array_key_exists;
 
-final class ConfigurableWopiConfiguration implements WopiConfigurationInterface
+final class ConfigurableWopiConfiguration implements ConfigurationInterface
 {
-    private WopiConfigurationInterface $properties;
+    private ConfigurationInterface $properties;
 
     private RequestStack $requestStack;
 
-    public function __construct(WopiConfigurationInterface $properties, RequestStack $requestStack)
+    public function __construct(ConfigurationInterface $properties, RequestStack $requestStack)
     {
         $this->properties = $properties;
         $this->requestStack = $requestStack;

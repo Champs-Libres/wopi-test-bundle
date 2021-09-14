@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service;
 
-use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
+use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DashboardController;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DocumentCrudController;
 use ChampsLibres\WopiTestBundle\Entity\Document;
@@ -152,7 +152,7 @@ final class Wopi implements WopiInterface
             ->psr17
             ->createResponse()
             ->withHeader(
-                'X-WOPI-ItemVersion',
+                WopiInterface::HEADER_ITEM_VERSION,
                 sprintf('v%s', $revision->getRev())
             )
             ->withHeader(
@@ -178,13 +178,13 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse()
-                ->withHeader('X-WOPI-Lock', $this->documentRepository->getLock($document));
+                ->withHeader(WopiInterface::HEADER_LOCK, $this->documentRepository->getLock($document));
         }
 
         return $this
             ->psr17
             ->createResponse(404)
-            ->withHeader('X-WOPI-Lock', '');
+            ->withHeader(WopiInterface::HEADER_LOCK, '');
     }
 
     public function getShareUrl(
@@ -229,9 +229,9 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse(409)
-                ->withHeader('X-WOPI-Lock', $currentLock)
+                ->withHeader(WopiInterface::HEADER_LOCK, $currentLock)
                 ->withHeader(
-                    'X-WOPI-ItemVersion',
+                    WopiInterface::HEADER_ITEM_VERSION,
                     sprintf('v%s', $version)
                 );
         }
@@ -242,7 +242,7 @@ final class Wopi implements WopiInterface
             ->psr17
             ->createResponse()
             ->withHeader(
-                'X-WOPI-ItemVersion',
+                WopiInterface::HEADER_ITEM_VERSION,
                 sprintf('v%s', $version)
             );
     }
@@ -264,7 +264,7 @@ final class Wopi implements WopiInterface
                     ->psr17
                     ->createResponse(409)
                     ->withHeader(
-                        'X-WOPI-ItemVersion',
+                        WopiInterface::HEADER_ITEM_VERSION,
                         sprintf('v%s', $version)
                     );
             }
@@ -277,11 +277,11 @@ final class Wopi implements WopiInterface
                     ->psr17
                     ->createResponse(409)
                     ->withHeader(
-                        'X-WOPI-Lock',
+                        WopiInterface::HEADER_LOCK,
                         $currentLock
                     )
                     ->withHeader(
-                        'X-WOPI-ItemVersion',
+                        WopiInterface::HEADER_ITEM_VERSION,
                         sprintf('v%s', $version)
                     );
             }
@@ -299,18 +299,18 @@ final class Wopi implements WopiInterface
             ->psr17
             ->createResponse()
             ->withHeader(
-                'X-WOPI-Lock',
+                WopiInterface::HEADER_LOCK,
                 $xWopiLock
             )
             ->withHeader(
-                'X-WOPI-ItemVersion',
+                WopiInterface::HEADER_ITEM_VERSION,
                 sprintf('v%s', $version)
             );
     }
 
     public function putRelativeFile(string $fileId, string $accessToken, ?string $suggestedTarget, ?string $relativeTarget, bool $overwriteRelativeTarget, int $size, RequestInterface $request): ResponseInterface
     {
-        if (($suggestedTarget !== null) && ($relativeTarget !== null)) {
+        if ((null !== $suggestedTarget) && (null !== $relativeTarget)) {
             return $this
                 ->psr17
                 ->createResponse(400);
@@ -354,14 +354,14 @@ final class Wopi implements WopiInterface
                         ->psr17
                         ->createResponse(409)
                         ->withHeader('Content-Type', 'application/json')
-                        ->withHeader('X-WOPI-ValidRelativeTarget', sprintf('%s.%s', uniqid(), $relativeTargetPathInfo['extension']));
+                        ->withHeader(WopiInterface::HEADER_VALID_RELATIVE_TARGET, sprintf('%s.%s', uniqid(), $relativeTargetPathInfo['extension']));
                 }
 
                 if ($this->documentRepository->hasLock($document)) {
                     return $this
                         ->psr17
                         ->createResponse(409)
-                        ->withHeader('X-WOPI-Lock', $this->documentRepository->getLock($document));
+                        ->withHeader(WopiInterface::HEADER_LOCK, $this->documentRepository->getLock($document));
                 }
             }
 
@@ -374,7 +374,7 @@ final class Wopi implements WopiInterface
         $new->setName($pathInfo['filename']);
         $new->setExtension($pathInfo['extension']);
         $new->setContent((string) $request->getBody());
-        $new->setSize($request->getHeaderLine('X-WOPI-Size'));
+        $new->setSize($request->getHeaderLine(WopiInterface::HEADER_SIZE));
 
         $this->documentRepository->add($new);
 
@@ -465,7 +465,7 @@ final class Wopi implements WopiInterface
                 return $this
                     ->psr17
                     ->createResponse(409)
-                    ->withHeader('X-WOPI-Lock', $currentLock);
+                    ->withHeader(WopiInterface::HEADER_LOCK, $currentLock);
             }
         }
 
@@ -498,7 +498,7 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse(409)
-                ->withHeader('X-WOPI-Lock', '');
+                ->withHeader(WopiInterface::HEADER_LOCK, '');
         }
 
         $currentLock = $this->documentRepository->getLock($document);
@@ -507,7 +507,7 @@ final class Wopi implements WopiInterface
             return $this
                 ->psr17
                 ->createResponse(409)
-                ->withHeader('X-WOPI-Lock', $currentLock);
+                ->withHeader(WopiInterface::HEADER_LOCK, $currentLock);
         }
 
         $this->documentRepository->deleteLock($document);
@@ -515,9 +515,9 @@ final class Wopi implements WopiInterface
         return $this
             ->psr17
             ->createResponse()
-            ->withHeader('X-WOPI-Lock', '')
+            ->withHeader(WopiInterface::HEADER_LOCK, '')
             ->withHeader(
-                'X-WOPI-ItemVersion',
+                WopiInterface::HEADER_ITEM_VERSION,
                 sprintf('v%s', $version)
             );
     }

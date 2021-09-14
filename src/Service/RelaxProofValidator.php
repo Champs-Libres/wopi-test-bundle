@@ -9,22 +9,22 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service;
 
-use ChampsLibres\WopiLib\Service\Contract\WopiProofValidatorInterface;
+use ChampsLibres\WopiLib\Contract\Service\ProofValidatorInterface;
 use Psr\Http\Message\RequestInterface;
 
-final class RelaxWopiProofValidator implements WopiProofValidatorInterface
+final class RelaxProofValidator implements ProofValidatorInterface
 {
-    private WopiProofValidatorInterface $wopiProofValidator;
+    private ProofValidatorInterface $proofValidator;
 
-    public function __construct(WopiProofValidatorInterface $wopiProofValidator)
+    public function __construct(ProofValidatorInterface $proofValidator)
     {
-        $this->wopiProofValidator = $wopiProofValidator;
+        $this->proofValidator = $proofValidator;
     }
 
     public function isValid(RequestInterface $request): bool
     {
         if (true === $request->hasHeader('X-WOPI-Proof') && true === $request->hasHeader('X-WOPI-ProofOld')) {
-            return $this->wopiProofValidator->isValid(($request));
+            return $this->proofValidator->isValid(($request));
         }
 
         return true;

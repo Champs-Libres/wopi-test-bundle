@@ -9,11 +9,11 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
-use ChampsLibres\WopiLib\Configuration\WopiConfigurationInterface;
-use ChampsLibres\WopiLib\Service\Contract\WopiInterface;
-use ChampsLibres\WopiLib\Service\Contract\WopiProofValidatorInterface;
+use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
+use ChampsLibres\WopiLib\Contract\Service\ProofValidatorInterface;
+use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use ChampsLibres\WopiTestBundle\Service\Configuration\ConfigurableWopiConfiguration;
-use ChampsLibres\WopiTestBundle\Service\RelaxWopiProofValidator;
+use ChampsLibres\WopiTestBundle\Service\RelaxProofValidator;
 use ChampsLibres\WopiTestBundle\Service\Wopi;
 
 return static function (ContainerConfigurator $container) {
@@ -40,11 +40,11 @@ return static function (ContainerConfigurator $container) {
 
     $services
         ->set(ConfigurableWopiConfiguration::class)
-        ->decorate(WopiConfigurationInterface::class)
+        ->decorate(ConfigurationInterface::class)
         ->arg('$properties', service('.inner'));
 
     $services
-        ->set(RelaxWopiProofValidator::class)
-        ->decorate(WopiProofValidatorInterface::class)
+        ->set(RelaxProofValidator::class)
+        ->decorate(ProofValidatorInterface::class)
         ->args([service('.inner')]);
 };
