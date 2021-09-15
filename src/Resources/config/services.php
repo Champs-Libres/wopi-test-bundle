@@ -9,10 +9,13 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
+use ChampsLibres\WopiBundle\Service\Wopi as ServiceWopi;
 use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
+use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiLib\Contract\Service\ProofValidatorInterface;
 use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use ChampsLibres\WopiTestBundle\Service\Configuration\ConfigurableWopiConfiguration;
+use ChampsLibres\WopiTestBundle\Service\DocumentManager;
 use ChampsLibres\WopiTestBundle\Service\RelaxProofValidator;
 use ChampsLibres\WopiTestBundle\Service\Wopi;
 
@@ -47,4 +50,15 @@ return static function (ContainerConfigurator $container) {
         ->set(RelaxProofValidator::class)
         ->decorate(ProofValidatorInterface::class)
         ->args([service('.inner')]);
+
+    $services
+        ->set(Wopi::class)
+        ->decorate(ServiceWopi::class)
+        ->arg('$wopi', service('.inner'));
+
+    $services
+        ->set(DocumentManager::class);
+
+    $services
+        ->alias(DocumentManagerInterface::class, DocumentManager::class);
 };

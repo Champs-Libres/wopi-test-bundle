@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Entity;
 
+use ChampsLibres\WopiLib\Contract\Entity\Document as WopiDocument;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
@@ -17,7 +18,7 @@ use Symfony\Component\Uid\Uuid;
  * @ORM\Table(name="documents")
  * @ORM\Entity
  */
-class Document
+class Document implements WopiDocument
 {
     /**
      * @ORM\Column(name="content", type="blob", nullable=true)
@@ -63,7 +64,7 @@ class Document
 
     public function __toString()
     {
-        return $this->getFilename();
+        return $this->getBasename();
     }
 
     public function addShare(Share $share): self
@@ -76,14 +77,24 @@ class Document
         return $this;
     }
 
+    public function getBasename(): string
+    {
+        return sprintf('%s.%s', $this->getName(), $this->getExtension());
+    }
+
     public function getContent()
     {
         return $this->content;
     }
 
-    public function getExtension(): ?string
+    public function getExtension(): string
     {
         return $this->extension;
+    }
+
+    public function getFileId(): string
+    {
+        return (string) $this->getUuid();
     }
 
     public function getFilename(): string
@@ -124,6 +135,11 @@ class Document
         return $this->uuid;
     }
 
+    public static function new(array $data): WopiDocument
+    {
+        return new self();
+    }
+
     public function removeShare(Share $share): self
     {
         if ($this->share->removeElement($share)) {
@@ -136,38 +152,41 @@ class Document
         return $this;
     }
 
-    public function setContent($content): self
+    public function setBasename(string $basename): void
+    {
+        $pathinfo = pathinfo($basename);
+
+        $this->setName($pathinfo['basename']);
+        $this->setExtension($pathinfo['extension']);
+    }
+
+    public function setContent($content): void
     {
         $this->content = $content;
-
-        return $this;
     }
 
-    public function setExtension(string $extension): self
+    public function setExtension(string $extension): void
     {
         $this->extension = $extension;
-
-        return $this;
     }
 
-    public function setName(string $name): self
+    public function setFilename(string $filename): void
+    {
+        $this->setName($filename);
+    }
+
+    public function setName(string $name): void
     {
         $this->name = $name;
-
-        return $this;
     }
 
-    public function setSize(string $size): self
+    public function setSize(string $size): void
     {
         $this->size = $size;
-
-        return $this;
     }
 
-    public function setUuid(Uuid $uuid): self
+    public function setUuid(Uuid $uuid): void
     {
         $this->uuid = $uuid;
-
-        return $this;
     }
 }

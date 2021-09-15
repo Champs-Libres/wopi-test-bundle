@@ -9,50 +9,46 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service;
 
+use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DashboardController;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DocumentCrudController;
-use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\Share;
-use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use loophp\psr17\Psr17Interface;
-use Psr\Cache\CacheItemPoolInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
+use SimpleThings\EntityAudit\AuditReader;
 use Symfony\Component\Routing\RouterInterface;
-use Symfony\Component\Security\Core\Security;
-
-use function strlen;
 
 final class Wopi implements WopiInterface
 {
     private AdminUrlGenerator $adminUrlGenerator;
 
-    private CacheItemPoolInterface $cache;
+    private AuditReader $auditReader;
 
-    private DocumentRepository $documentRepository;
+    private DocumentManagerInterface $documentManager;
 
     private Psr17Interface $psr17;
 
-    private RouterInterface $routerInterface;
+    private RouterInterface $router;
 
-    private Security $security;
+    private WopiInterface $wopi;
 
     public function __construct(
         AdminUrlGenerator $adminUrlGenerator,
-        DocumentRepository $documentRepository,
+        AuditReader $auditReader,
+        DocumentManagerInterface $documentManager,
         Psr17Interface $psr17,
-        CacheItemPoolInterface $cache,
-        RouterInterface $routerInterface,
-        Security $security
+        RouterInterface $router,
+        WopiInterface $wopi
     ) {
         $this->adminUrlGenerator = $adminUrlGenerator;
-        $this->documentRepository = $documentRepository;
+        $this->auditReader = $auditReader;
+        $this->documentManager = $documentManager;
         $this->psr17 = $psr17;
-        $this->cache = $cache;
-        $this->routerInterface = $routerInterface;
-        $this->security = $security;
+        $this->router = $router;
+        $this->wopi = $wopi;
     }
 
     public function checkFileInfo(
@@ -60,75 +56,42 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findLatestRevisionFromFileId($fileId);
+        $response = $this->wopi->checkFileInfo($fileId, $accessToken, $request);
 
-        $user = $this->security->getUser();
+        $document = $this->documentManager->findByDocumentId($fileId);
+        $revision = $this->auditReader->findRevision($this->documentManager->getVersion($document));
+
+        $body = json_decode((string) $response->getBody(), true);
 
         if ($document->getShare()->isEmpty()) {
             $share = new Share();
             $share->setDocument($document);
             $document->addShare($share);
-            $this->documentRepository->add($document);
+            $this->documentManager->write($document);
         }
 
-        $userCacheKey = sprintf('wopi_putUserInfo_%s', $this->security->getUser()->getUserIdentifier());
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader('Content-Type', 'application/json')
-            ->withBody($this->psr17->createStream((string) json_encode(
-                [
-                    'BaseFileName' => $document->getFilename(),
-                    'OwnerId' => 'Symfony',
-                    'Size' => (int) $document->getSize(),
-                    'UserId' => $user->getUserIdentifier(),
-                    'Version' => sprintf('v%s', $revision->getRev()),
-                    'ReadOnly' => false,
-                    'UserCanAttend' => true,
-                    'UserCanPresent' => true,
-                    'UserCanRename' => true,
-                    'UserCanWrite' => true,
-                    'UserCanNotWriteRelative' => false,
-                    'SupportsUserInfo' => true,
-                    'SupportsDeleteFile' => true,
-                    'SupportsLocks' => true,
-                    'SupportsGetLock' => true,
-                    'SupportsExtendedLockLength' => true,
-                    'UserFriendlyName' => sprintf('User %s', $user->getUserIdentifier()),
-                    'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.uP'),
-                    'SupportsUpdate' => true,
-                    'SupportsRename' => true,
-                    'DisablePrint' => false,
-                    'AllowExternalMarketplace' => true,
-                    'SupportedShareUrlTypes' => [
-                        'ReadOnly',
-                    ],
-                    'DownloadUrl' => $this->routerInterface->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
-                    'FileSharingUrl' => $this->routerInterface->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
-                    'BreadcrumbBrandName' => 'BreadcrumbBrandName',
-                    'SHA256' => $document->getSha256(),
-                    'UserInfo' => (string) $this->cache->getItem($userCacheKey)->get(),
-                ]
-            )));
+        return $response
+            ->withBody(
+                $this
+                    ->psr17
+                    ->createStream(
+                        (string) json_encode(
+                            $body +
+                            [
+                                'Version' => sprintf('v%s', $revision->getRev()),
+                                'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.uP'),
+                                'DownloadUrl' => $this->router->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
+                                'FileSharingUrl' => $this->router->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
+                                'SHA256' => $document->getSha256(),
+                            ]
+                        )
+                    )
+            );
     }
 
     public function deleteFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $document = $this->documentRepository->findFromFileId($fileId);
-
-        if ($this->documentRepository->hasLock($document)) {
-            return $this
-                ->psr17
-                ->createResponse(409);
-        }
-
-        $this->documentRepository->remove($document);
-
-        return $this
-            ->psr17
-            ->createResponse(200);
+        return $this->wopi->deleteFile($fileId, $accessToken, $request);
     }
 
     public function enumerateAncestors(
@@ -136,55 +99,17 @@ final class Wopi implements WopiInterface
         ?string $accessToken,
         RequestInterface $request
     ): ResponseInterface {
-        return $this->getDebugResponse(__FUNCTION__, $request);
+        return $this->wopi->enumerateAncestors($fileId, $accessToken, $request);
     }
 
     public function getFile(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $document = $this->documentRepository->findFromFileId($fileId);
-        $revision = $this->documentRepository->findLatestRevisionFromFileId($fileId);
-
-        $content = (null === $contentResource = $document->getContent()) ?
-            $this->psr17->createStream('') :
-            $this->psr17->createStreamFromResource($contentResource);
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader(
-                WopiInterface::HEADER_ITEM_VERSION,
-                sprintf('v%s', $revision->getRev())
-            )
-            ->withHeader(
-                'Content-Type',
-                'application/octet-stream',
-            )
-            ->withHeader(
-                'Content-Length',
-                $document->getSize()
-            )
-            ->withHeader(
-                'Content-Disposition',
-                sprintf('attachment; filename=%s', $document->getFilename())
-            )
-            ->withBody($content);
+        return $this->wopi->getFile($fileId, $accessToken, $request);
     }
 
     public function getLock(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $document = $this->documentRepository->findFromFileId($fileId);
-
-        if ($this->documentRepository->hasLock($document)) {
-            return $this
-                ->psr17
-                ->createResponse()
-                ->withHeader(WopiInterface::HEADER_LOCK, $this->documentRepository->getLock($document));
-        }
-
-        return $this
-            ->psr17
-            ->createResponse(404)
-            ->withHeader(WopiInterface::HEADER_LOCK, '');
+        return $this->wopi->getLock($fileId, $accessToken, $request);
     }
 
     public function getShareUrl(
@@ -218,33 +143,7 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findFromFileId($fileId);
-        $version = $this->documentRepository->getVersion($document);
-
-        if ($this->documentRepository->hasLock($document)) {
-            if ($xWopiLock === $currentLock = $this->documentRepository->getLock($document)) {
-                return $this->refreshLock($fileId, $accessToken, $xWopiLock, $request);
-            }
-
-            return $this
-                ->psr17
-                ->createResponse(409)
-                ->withHeader(WopiInterface::HEADER_LOCK, $currentLock)
-                ->withHeader(
-                    WopiInterface::HEADER_ITEM_VERSION,
-                    sprintf('v%s', $version)
-                );
-        }
-
-        $this->documentRepository->lock($document, $xWopiLock);
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader(
-                WopiInterface::HEADER_ITEM_VERSION,
-                sprintf('v%s', $version)
-            );
+        return $this->wopi->lock($fileId, $accessToken, $xWopiLock, $request);
     }
 
     public function putFile(
@@ -254,184 +153,43 @@ final class Wopi implements WopiInterface
         string $xWopiEditors,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findFromFileId($fileId);
-        $version = $this->documentRepository->getVersion($document);
-
-        // File is unlocked
-        if (false === $this->documentRepository->hasLock($document)) {
-            if ('0' !== $document->getSize()) {
-                return $this
-                    ->psr17
-                    ->createResponse(409)
-                    ->withHeader(
-                        WopiInterface::HEADER_ITEM_VERSION,
-                        sprintf('v%s', $version)
-                    );
-            }
-        }
-
-        // File is locked
-        if ($this->documentRepository->hasLock($document)) {
-            if ($xWopiLock !== $currentLock = $this->documentRepository->getLock($document)) {
-                return $this
-                    ->psr17
-                    ->createResponse(409)
-                    ->withHeader(
-                        WopiInterface::HEADER_LOCK,
-                        $currentLock
-                    )
-                    ->withHeader(
-                        WopiInterface::HEADER_ITEM_VERSION,
-                        sprintf('v%s', $version)
-                    );
-            }
-        }
-
-        $body = (string) $request->getBody();
-
-        $document->setContent($body);
-        $document->setSize((string) strlen($body));
-
-        $this->documentRepository->add($document);
-        $version = $this->documentRepository->getVersion($document);
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader(
-                WopiInterface::HEADER_LOCK,
-                $xWopiLock
-            )
-            ->withHeader(
-                WopiInterface::HEADER_ITEM_VERSION,
-                sprintf('v%s', $version)
-            );
+        return $this->wopi->putFile($fileId, $accessToken, $xWopiLock, $xWopiEditors, $request);
     }
 
     public function putRelativeFile(string $fileId, string $accessToken, ?string $suggestedTarget, ?string $relativeTarget, bool $overwriteRelativeTarget, int $size, RequestInterface $request): ResponseInterface
     {
-        if ((null !== $suggestedTarget) && (null !== $relativeTarget)) {
-            return $this
-                ->psr17
-                ->createResponse(400);
+        $response = $this->wopi->putRelativeFile($fileId, $accessToken, $suggestedTarget, $relativeTarget, $overwriteRelativeTarget, $size, $request);
+
+        if (200 !== $response->getStatusCode()) {
+            return $response;
         }
 
-        if (null !== $suggestedTarget) {
-            // If it starts with a dot...
-            if (0 === strpos($suggestedTarget, '.', 0)) {
-                $document = $this->documentRepository->findFromFileId($fileId);
-                $suggestedTarget = sprintf('%s%s', $document->getName(), $suggestedTarget);
-            }
-
-            $target = $suggestedTarget;
-        }
-
-        if (null !== $relativeTarget) {
-            $relativeTargetPathInfo = pathinfo($relativeTarget);
-
-            /** @var Document|null $document */
-            $document = $this->documentRepository->findOneBy([
-                'name' => $relativeTargetPathInfo['filename'],
-                'extension' => $relativeTargetPathInfo['extension'],
-            ]);
-
-            /**
-             * If a file with the specified name already exists,
-             * the host must respond with a 409 Conflict,
-             * unless the X-WOPI-OverwriteRelativeTarget request header is set to true.
-             *
-             * When responding with a 409 Conflict for this reason,
-             * the host may include an X-WOPI-ValidRelativeTarget specifying a file name that is valid.
-             *
-             * If the X-WOPI-OverwriteRelativeTarget request header is set to true
-             * and a file with the specified name already exists and is locked,
-             * the host must respond with a 409 Conflict and include an
-             * X-WOPI-Lock response header containing the value of the current lock on the file.
-             */
-            if (null !== $document) {
-                if (false === $overwriteRelativeTarget) {
-                    return $this
-                        ->psr17
-                        ->createResponse(409)
-                        ->withHeader('Content-Type', 'application/json')
-                        ->withHeader(WopiInterface::HEADER_VALID_RELATIVE_TARGET, sprintf('%s.%s', uniqid(), $relativeTargetPathInfo['extension']));
-                }
-
-                if ($this->documentRepository->hasLock($document)) {
-                    return $this
-                        ->psr17
-                        ->createResponse(409)
-                        ->withHeader(WopiInterface::HEADER_LOCK, $this->documentRepository->getLock($document));
-                }
-            }
-
-            $target = $relativeTarget;
-        }
-
-        $pathInfo = pathinfo($target);
-
-        $new = new Document();
-        $new->setName($pathInfo['filename']);
-        $new->setExtension($pathInfo['extension']);
-        $new->setContent((string) $request->getBody());
-        $new->setSize($request->getHeaderLine(WopiInterface::HEADER_SIZE));
-
-        $this->documentRepository->add($new);
-
-        $uri = $this
-            ->psr17
-            ->createUri(
-                $this
-                    ->routerInterface
-                    ->generate(
-                        'checkFileInfo',
-                        [
-                            'fileId' => $new->getUuid(),
-                        ],
-                        RouterInterface::ABSOLUTE_URL
-                    )
-            )
-            ->withQuery(http_build_query([
-                'access_token' => $accessToken,
-            ]));
+        $properties = json_decode((string) $response->getBody(), true);
 
         $properties = [
-            'Name' => $new->getFilename(),
-            'Url' => (string) $uri,
             'HostEditUrl' => $this
                 ->adminUrlGenerator
                 ->setDashboard(DashboardController::class)
                 ->setAction('edit')
                 ->setController(DocumentCrudController::class)
-                ->setEntityId($new->getId())
+                ->setEntityId($properties['HostEditUrl'])
                 ->generateUrl(),
             'HostViewUrl' => $this
                 ->adminUrlGenerator
                 ->setDashboard(DashboardController::class)
                 ->setAction('detail')
                 ->setController(DocumentCrudController::class)
-                ->setEntityId($new->getId())
+                ->setEntityId($properties['HostViewUrl'])
                 ->generateUrl(),
-        ];
+        ] + $properties;
 
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader('Content-Type', 'application/json')
+        return $response
             ->withBody($this->psr17->createStream((string) json_encode($properties)));
     }
 
     public function putUserInfo(string $fileId, ?string $accessToken, RequestInterface $request): ResponseInterface
     {
-        $userCacheKey = sprintf('wopi_putUserInfo_%s', $this->security->getUser()->getUserIdentifier());
-
-        $cacheItem = $this->cache->getItem($userCacheKey);
-        $cacheItem->set((string) $request->getBody());
-        $this->cache->save($cacheItem);
-
-        return $this
-            ->psr17
-            ->createResponse();
+        return $this->wopi->putUserInfo($fileId, $accessToken, $request);
     }
 
     public function refreshLock(
@@ -440,9 +198,7 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        $this->unlock($fileId, $accessToken, $xWopiLock, $request);
-
-        return $this->lock($fileId, $accessToken, $xWopiLock, $request);
+        return $this->wopi->refreshLock($fileId, $accessToken, $xWopiLock, $request);
     }
 
     public function renameFile(
@@ -452,37 +208,7 @@ final class Wopi implements WopiInterface
         string $xWopiRequestedName,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findFromFileId($fileId);
-
-        if (null === $document) {
-            return $this
-                ->psr17
-                ->createResponse(404);
-        }
-
-        if ($this->documentRepository->hasLock($document)) {
-            if ($xWopiLock !== $currentLock = $this->documentRepository->getLock($document)) {
-                return $this
-                    ->psr17
-                    ->createResponse(409)
-                    ->withHeader(WopiInterface::HEADER_LOCK, $currentLock);
-            }
-        }
-
-        $document->setName($xWopiRequestedName);
-        $this->documentRepository->add($document);
-
-        $data = [
-            'Name' => $xWopiRequestedName,
-        ];
-
-        return $this
-            ->psr17
-            ->createResponse(200)
-            ->withHeader('Content-Type', 'application/json')
-            ->withBody(
-                $this->psr17->createStream((string) json_encode($data))
-            );
+        return $this->wopi->renameFile($fileId, $accessToken, $xWopiLock, $xWopiRequestedName, $request);
     }
 
     public function unlock(
@@ -491,35 +217,7 @@ final class Wopi implements WopiInterface
         string $xWopiLock,
         RequestInterface $request
     ): ResponseInterface {
-        $document = $this->documentRepository->findFromFileId($fileId);
-        $version = $this->documentRepository->getVersion($document);
-
-        if (!$this->documentRepository->hasLock($document)) {
-            return $this
-                ->psr17
-                ->createResponse(409)
-                ->withHeader(WopiInterface::HEADER_LOCK, '');
-        }
-
-        $currentLock = $this->documentRepository->getLock($document);
-
-        if ($currentLock !== $xWopiLock) {
-            return $this
-                ->psr17
-                ->createResponse(409)
-                ->withHeader(WopiInterface::HEADER_LOCK, $currentLock);
-        }
-
-        $this->documentRepository->deleteLock($document);
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader(WopiInterface::HEADER_LOCK, '')
-            ->withHeader(
-                WopiInterface::HEADER_ITEM_VERSION,
-                sprintf('v%s', $version)
-            );
+        return $this->wopi->unlock($fileId, $accessToken, $xWopiLock, $request);
     }
 
     public function unlockAndRelock(
@@ -529,26 +227,6 @@ final class Wopi implements WopiInterface
         string $xWopiOldLock,
         RequestInterface $request
     ): ResponseInterface {
-        $this->unlock($fileId, $accessToken, $xWopiOldLock, $request);
-
-        return $this->lock($fileId, $accessToken, $xWopiLock, $request);
-    }
-
-    private function getDebugResponse(string $method, RequestInterface $request): ResponseInterface
-    {
-        $params = [];
-        parse_str($request->getUri()->getQuery(), $params);
-
-        $data = (string) json_encode(array_merge(
-            ['method' => $method],
-            $params,
-            $request->getHeaders()
-        ));
-
-        return $this
-            ->psr17
-            ->createResponse()
-            ->withHeader('Content-Type', 'application/json')
-            ->withBody($this->psr17->createStream($data));
+        return $this->wopi->unlockAndRelock($fileId, $accessToken, $xWopiLock, $xWopiOldLock, $request);
     }
 }

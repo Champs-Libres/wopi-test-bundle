@@ -9,8 +9,8 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Admin\Field\Configurator;
 
+use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
-use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
@@ -18,16 +18,16 @@ use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
 
 final class WopiDocumentLockFieldConfigurator implements FieldConfiguratorInterface
 {
-    private DocumentRepository $documentRepository;
+    private DocumentManagerInterface $documentManager;
 
-    public function __construct(DocumentRepository $documentRepository)
+    public function __construct(DocumentManagerInterface $documentManager)
     {
-        $this->documentRepository = $documentRepository;
+        $this->documentManager = $documentManager;
     }
 
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
-        $isLocked = $this->documentRepository->hasLock($entityDto->getInstance());
+        $isLocked = $this->documentManager->hasLock($entityDto->getInstance());
 
         $field->setFormattedValue($isLocked);
     }

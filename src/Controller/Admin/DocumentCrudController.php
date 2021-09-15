@@ -11,11 +11,11 @@ namespace ChampsLibres\WopiTestBundle\Controller\Admin;
 
 use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
 use ChampsLibres\WopiLib\Contract\Service\Discovery\DiscoveryInterface;
+use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
-use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
@@ -52,7 +52,7 @@ final class DocumentCrudController extends AbstractCrudController
 
     private DiscoveryInterface $discovery;
 
-    private DocumentRepository $documentRepository;
+    private DocumentManagerInterface $documentManager;
 
     private JWTManager $jwtManager;
 
@@ -70,7 +70,7 @@ final class DocumentCrudController extends AbstractCrudController
         AuditReader $auditReader,
         Security $security,
         JWTTokenManagerInterface $jwtManager,
-        DocumentRepository $documentRepository
+        DocumentManagerInterface $documentManager
     ) {
         $this->configuration = $configuration;
         $this->discovery = $discovery;
@@ -79,14 +79,14 @@ final class DocumentCrudController extends AbstractCrudController
         $this->auditReader = $auditReader;
         $this->security = $security;
         $this->jwtManager = $jwtManager;
-        $this->documentRepository = $documentRepository;
+        $this->documentManager = $documentManager;
     }
 
     public function configureActions(Actions $actions): Actions
     {
         $unlockDocument = Action::new('unlock', 'Unlock')
             ->linkToCrudAction('unlockDocument')
-            ->displayIf(fn (Document $document): bool => $this->documentRepository->hasLock($document));
+            ->displayIf(fn (Document $document): bool => $this->documentManager->hasLock($document));
 
         $showHistory = Action::new('history', 'History')
             ->linkToCrudAction('showHistory');
@@ -254,7 +254,7 @@ final class DocumentCrudController extends AbstractCrudController
     {
         $document = $context->getEntity()->getInstance();
 
-        $this->documentRepository->deleteLock($document);
+        $this->documentManager->deleteLock($document);
 
         return $this->redirect($context->getReferrer());
     }
@@ -265,7 +265,7 @@ final class DocumentCrudController extends AbstractCrudController
 
         foreach ($batchActionDto->getEntityIds() as $id) {
             $document = $entityManager->find(Document::class, $id);
-            $this->documentRepository->deleteLock($document);
+            $this->documentManager->deleteLock($document);
         }
 
         return $this->redirect($batchActionDto->getReferrerUrl());

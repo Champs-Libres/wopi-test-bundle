@@ -20,7 +20,8 @@
         "symfony/form": "^5.3",
         "symfony/orm-pack": "^2.1",
         "symfony/profiler-pack": "^1.0",
-        "symfony/uid": "^5.3"
+        "symfony/uid": "^5.3",
+        "symfony/serializer": "^5.3"
     },
     "require-dev": {
         "drupol/php-conventions": "^5.0",
