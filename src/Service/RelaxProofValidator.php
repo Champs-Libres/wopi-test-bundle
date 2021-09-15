@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Service;
 
 use ChampsLibres\WopiLib\Contract\Service\ProofValidatorInterface;
+use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use Psr\Http\Message\RequestInterface;
 
 final class RelaxProofValidator implements ProofValidatorInterface
@@ -23,7 +24,7 @@ final class RelaxProofValidator implements ProofValidatorInterface
 
     public function isValid(RequestInterface $request): bool
     {
-        if (true === $request->hasHeader('X-WOPI-Proof') && true === $request->hasHeader('X-WOPI-ProofOld')) {
+        if (true === $request->hasHeader(WopiInterface::HEADER_PROOF) && true === $request->hasHeader(WopiInterface::HEADER_PROOF_OLD)) {
             return $this->proofValidator->isValid(($request));
         }
 
