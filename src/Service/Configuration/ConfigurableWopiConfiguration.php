@@ -10,30 +10,41 @@ declare(strict_types=1);
 namespace ChampsLibres\WopiTestBundle\Service\Configuration;
 
 use ChampsLibres\WopiLib\Contract\Service\Configuration\ConfigurationInterface;
-use Symfony\Component\HttpFoundation\RequestStack;
+use Psr\Cache\CacheItemPoolInterface;
+use Symfony\Component\Security\Core\Security;
 
 use function array_key_exists;
 
 final class ConfigurableWopiConfiguration implements ConfigurationInterface
 {
+    private CacheItemPoolInterface $cache;
+
     private ConfigurationInterface $properties;
 
-    private RequestStack $requestStack;
+    private Security $security;
 
-    public function __construct(ConfigurationInterface $properties, RequestStack $requestStack)
-    {
+    public function __construct(
+        CacheItemPoolInterface $cache,
+        ConfigurationInterface $properties,
+        Security $security
+    ) {
+        $this->cache = $cache;
         $this->properties = $properties;
-        $this->requestStack = $requestStack;
+        $this->security = $security;
     }
 
     public function jsonSerialize(): array
     {
+        $configuration = [];
+
+        if (null !== $this->security->getUser()) {
+            $cacheItem = $this->cache->getItem((string) $this->security->getUser());
+            $configuration = (array) $cacheItem->get();
+        }
+
         return array_merge(
             $this->properties->jsonSerialize(),
-            $this
-                ->requestStack
-                ->getSession()
-                ->get('configuration', [])
+            $configuration
         );
     }
 
@@ -51,13 +62,23 @@ final class ConfigurableWopiConfiguration implements ConfigurationInterface
     {
         $configuration = $this->jsonSerialize();
         $configuration[$offset] = $value;
-        $this->requestStack->getSession()->set('configuration', $configuration);
+
+        if (null !== $this->security->getUser()) {
+            $cacheItem = $this->cache->getItem((string) $this->security->getUser());
+            $cacheItem->set($configuration);
+            $this->cache->save($cacheItem);
+        }
     }
 
     public function offsetUnset($offset)
     {
         $configuration = $this->jsonSerialize();
         unset($configuration[$offset]);
-        $this->requestStack->getSession()->set('configuration', $configuration);
+
+        if (null !== $this->security->getUser()) {
+            $cacheItem = $this->cache->getItem((string) $this->security->getUser());
+            $cacheItem->set($configuration);
+            $this->cache->save($cacheItem);
+        }
     }
 }

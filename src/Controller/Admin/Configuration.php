@@ -44,7 +44,9 @@ final class Configuration extends AbstractController
                 return new RedirectResponse('configuration');
             }
 
-            $request->getSession()->set('configuration', $form->getData());
+            foreach ($form->getData() as $key => $value) {
+                $this->configuration[$key] = $value;
+            }
         }
 
         return $this
