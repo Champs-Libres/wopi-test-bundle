@@ -64,7 +64,7 @@ final class DocumentManager implements DocumentManagerInterface
 
     public function deleteLock(Document $document): void
     {
-        $this->documentLockManager->deleteLock($document->getFileId(), $this->request);
+        $this->documentLockManager->deleteLock($document, $this->request);
     }
 
     public function findByDocumentFilename(string $documentFilename): ?Document
@@ -86,22 +86,22 @@ final class DocumentManager implements DocumentManagerInterface
 
     public function getLock(Document $document): string
     {
-        return $this->documentLockManager->getLock($document->getFileId(), $this->request);
+        return $this->documentLockManager->getLock($document, $this->request);
     }
 
     public function getVersion(Document $document): string
     {
-        return (string) $this->findLatestRevisionFromFileId((string) $document->getFileId())->getRev();
+        return (string) $this->findLatestRevisionFromFileId((string) $document->getWopiFileId())->getRev();
     }
 
     public function hasLock(Document $document): bool
     {
-        return $this->documentLockManager->hasLock($document->getFileId(), $this->request);
+        return $this->documentLockManager->hasLock($document, $this->request);
     }
 
     public function lock(Document $document, string $lockId): void
     {
-        $this->documentLockManager->setLock($document->getFileId(), $lockId, $this->request);
+        $this->documentLockManager->setLock($document, $lockId, $this->request);
     }
 
     public function remove(Document $document): void
