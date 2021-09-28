@@ -14,6 +14,8 @@ use ChampsLibres\WopiLib\Contract\Service\DocumentLockManagerInterface;
 use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document as EntityDocument;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
+use DateTimeInterface;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
@@ -107,9 +109,29 @@ final class DocumentManager implements DocumentManagerInterface
     /**
      * @param EntityDocument $document
      */
+    public function getCreationDate(WopiDocument $document): DateTimeInterface
+    {
+        $collection = new ArrayCollection($this->auditReader->findRevisions(EntityDocument::class, $document->getId()));
+
+        return $collection->last()->getTimestamp();
+    }
+
+    /**
+     * @param EntityDocument $document
+     */
     public function getDocumentId(WopiDocument $document): string
     {
         return $document->getWopiDocId();
+    }
+
+    /**
+     * @param EntityDocument $document
+     */
+    public function getLastModifiedDate(WopiDocument $document): DateTimeInterface
+    {
+        $revision = $this->auditReader->getCurrentRevision(EntityDocument::class, $document->getId());
+
+        return $this->auditReader->findRevision($revision)->getTimestamp();
     }
 
     public function getLock(WopiDocument $document): string

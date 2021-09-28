@@ -14,7 +14,6 @@ use ChampsLibres\WopiLib\Contract\Service\Discovery\DiscoveryInterface;
 use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentLockField;
-use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionField;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
 use EasyCorp\Bundle\EasyAdminBundle\Collection\FieldCollection;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
@@ -126,8 +125,6 @@ final class DocumentCrudController extends AbstractCrudController
         yield IntegerField::new('size')
             ->hideWhenCreating()
             ->hideWhenUpdating();
-
-        yield WopiDocumentRevisionField::new('id');
 
         yield WopiDocumentRevisionTimestampField::new('id');
 

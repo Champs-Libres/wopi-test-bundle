@@ -9,33 +9,26 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service\Admin\Field\Configurator;
 
-use ChampsLibres\WopiTestBundle\Entity\Document;
+use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Service\Admin\Field\WopiDocumentRevisionTimestampField;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldConfiguratorInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
-use SimpleThings\EntityAudit\AuditReader;
 
 final class WopiDocumentRevisionTimestampFieldConfigurator implements FieldConfiguratorInterface
 {
-    private AuditReader $auditReader;
+    private DocumentManagerInterface $documentManager;
 
-    public function __construct(AuditReader $auditReader)
+    public function __construct(DocumentManagerInterface $documentManager)
     {
-        $this->auditReader = $auditReader;
+        $this->documentManager = $documentManager;
     }
 
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
-        $revisions = $this
-            ->auditReader
-            ->findRevisions(Document::class, $field->getValue());
-
-        if ([] !== $revisions) {
-            $field
-                ->setFormattedValue(reset($revisions)->getTimestamp()->format('Y/m/d H:i:s'));
-        }
+        $field
+            ->setFormattedValue($this->documentManager->getLastModifiedDate($entityDto->getInstance())->format('Y/m/d H:i:s'));
     }
 
     public function supports(FieldDto $field, EntityDto $entityDto): bool

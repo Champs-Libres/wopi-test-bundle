@@ -13,6 +13,7 @@ use ChampsLibres\WopiLib\Contract\Entity\Document as WopiDocument;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
+use function strlen;
 
 /**
  * @ORM\Table(name="documents")
@@ -60,11 +61,6 @@ class Document implements WopiDocument
     public function __construct()
     {
         $this->uuid = Uuid::v4();
-    }
-
-    public function getWopiDocId(): string
-    {
-        return (string) $this->getUuid();
     }
 
     public function __toString()
@@ -135,6 +131,11 @@ class Document implements WopiDocument
         return $this->uuid;
     }
 
+    public function getWopiDocId(): string
+    {
+        return (string) $this->getUuid();
+    }
+
     public function removeShare(Share $share): self
     {
         if ($this->share->removeElement($share)) {
@@ -158,6 +159,7 @@ class Document implements WopiDocument
     public function setContent($content): void
     {
         $this->content = $content;
+        $this->size = (string) strlen($content);
     }
 
     public function setExtension(string $extension): void
