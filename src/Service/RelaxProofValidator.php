@@ -24,7 +24,10 @@ final class RelaxProofValidator implements ProofValidatorInterface
 
     public function isValid(RequestInterface $request): bool
     {
-        if (true === $request->hasHeader(WopiInterface::HEADER_PROOF) && true === $request->hasHeader(WopiInterface::HEADER_PROOF_OLD)) {
+        $hasHeaderProof = $request->hasHeader(WopiInterface::HEADER_PROOF);
+        $hasHeaderProofOld = $request->hasHeader(WopiInterface::HEADER_PROOF_OLD);
+
+        if (true === $hasHeaderProof && true === $hasHeaderProofOld) {
             return $this->proofValidator->isValid(($request));
         }
 

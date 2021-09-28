@@ -30,7 +30,20 @@ final class FakeUserProvider implements UserProviderInterface
             throw new UserNotFoundException('User %s not found.');
         }
 
-        return new InMemoryUser($identifier, $this->userPasswordHasher->hashPassword(new InMemoryUser($identifier, null, ['ROLE_USER']), $identifier), ['ROLE_USER']);
+        return new InMemoryUser(
+            $identifier,
+            $this
+                ->userPasswordHasher
+                ->hashPassword(
+                    new InMemoryUser(
+                        $identifier,
+                        null,
+                        ['ROLE_USER']
+                    ),
+                    $identifier
+                ),
+            ['ROLE_USER']
+        );
     }
 
     public function loadUserByUsername(string $username)

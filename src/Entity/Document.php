@@ -62,6 +62,11 @@ class Document implements WopiDocument
         $this->uuid = Uuid::v4();
     }
 
+    public function getWopiDocId(): string
+    {
+        return (string) $this->getUuid();
+    }
+
     public function __toString()
     {
         return $this->getBasename();
@@ -112,11 +117,6 @@ class Document implements WopiDocument
         return $this->name;
     }
 
-    public function getSha256(): string
-    {
-        return base64_encode(hash('sha256', (string) $this->getContent()));
-    }
-
     /**
      * @return Collection|Share[]
      */
@@ -133,46 +133,6 @@ class Document implements WopiDocument
     public function getUuid(): Uuid
     {
         return $this->uuid;
-    }
-
-    public function getWopiBasename(): string
-    {
-        return $this->getBasename();
-    }
-
-    public function getWopiContent()
-    {
-        return $this->getContent();
-    }
-
-    public function getWopiExtension(): string
-    {
-        return $this->getExtension();
-    }
-
-    public function getWopiFileId(): string
-    {
-        return $this->getFileId();
-    }
-
-    public function getWopiFilename(): string
-    {
-        return $this->getFilename();
-    }
-
-    public function getWopiSha256(): string
-    {
-        return $this->getSha256();
-    }
-
-    public function getWopiSize(): string
-    {
-        return $this->getSize();
-    }
-
-    public static function newWopi(array $data): WopiDocument
-    {
-        return new self();
     }
 
     public function removeShare(Share $share): self
@@ -223,30 +183,5 @@ class Document implements WopiDocument
     public function setUuid(Uuid $uuid): void
     {
         $this->uuid = $uuid;
-    }
-
-    public function setWopiBasename(string $basename): void
-    {
-        $this->setBasename($basename);
-    }
-
-    public function setWopiContent(string $content): void
-    {
-        $this->setContent($content);
-    }
-
-    public function setWopiExtension(string $extension): void
-    {
-        $this->setExtension($extension);
-    }
-
-    public function setWopiFilename(string $filename): void
-    {
-        $this->setFilename($filename);
-    }
-
-    public function setWopiSize(string $size): void
-    {
-        $this->setSize($size);
     }
 }

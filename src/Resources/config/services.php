@@ -35,7 +35,10 @@ return static function (ContainerConfigurator $container) {
         ->tag('controller.service_arguments');
 
     $services
-        ->load('ChampsLibres\\WopiTestBundle\\Service\\Admin\\Field\\Configurator\\', __DIR__ . '/../../Service/Admin/Field/Configurator')
+        ->load(
+            'ChampsLibres\\WopiTestBundle\\Service\\Admin\\Field\\Configurator\\',
+            __DIR__ . '/../../Service/Admin/Field/Configurator'
+        )
         ->tag('ea.field_configurator');
 
     $services

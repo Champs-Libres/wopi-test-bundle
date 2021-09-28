@@ -155,7 +155,12 @@ final class DocumentCrudController extends AbstractCrudController
             throw new Exception('Unsupported extension.');
         }
 
-        $configuration['access_token'] = $this->jwtManager->createFromPayload($this->security->getUser(), ['fileUuid' => $document->getUuid()]);
+        $configuration['access_token'] = $this
+            ->jwtManager
+            ->createFromPayload(
+                $this->security->getUser(),
+                ['fileUuid' => $document->getUuid()]
+            );
         $configuration['server'] = $this
             ->psr17
             ->createUri($discoverExtension[0]['urlsrc'])
@@ -174,7 +179,12 @@ final class DocumentCrudController extends AbstractCrudController
                 )
             );
 
-        $this->get(EntityFactory::class)->processActions($context->getEntity(), $context->getCrud()->getActionsConfig());
+        $this
+            ->get(EntityFactory::class)
+            ->processActions(
+                $context->getEntity(),
+                $context->getCrud()->getActionsConfig()
+            );
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new(array_merge(
             $configuration,
@@ -214,7 +224,13 @@ final class DocumentCrudController extends AbstractCrudController
         }
 
         $fields = FieldCollection::new($this->configureFields(Crud::PAGE_INDEX));
-        $filters = $this->get(FilterFactory::class)->create($context->getCrud()->getFiltersConfig(), $fields, $context->getEntity());
+        $filters = $this
+            ->get(FilterFactory::class)
+            ->create(
+                $context->getCrud()->getFiltersConfig(),
+                $fields,
+                $context->getEntity()
+            );
         $queryBuilder = $this->createIndexQueryBuilder($context->getSearch(), $context->getEntity(), $fields, $filters);
         $paginator = $this->get(PaginatorFactory::class)->create($queryBuilder);
 
@@ -227,7 +243,12 @@ final class DocumentCrudController extends AbstractCrudController
         }
 
         $entity = $context->getEntity();
-        $entities = $this->auditReader->findRevisions($context->getEntity()->getFqcn(), $entity->getInstance()->getId());
+        $entities = $this
+            ->auditReader
+            ->findRevisions(
+                $context->getEntity()->getFqcn(),
+                $entity->getInstance()->getId()
+            );
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
             'revisions' => $entities,

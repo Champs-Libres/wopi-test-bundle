@@ -9,19 +9,24 @@ declare(strict_types=1);
 
 namespace ChampsLibres\WopiTestBundle\Service;
 
-use ChampsLibres\WopiLib\Contract\Entity\Document;
+use ChampsLibres\WopiLib\Contract\Entity\Document as WopiDocument;
 use ChampsLibres\WopiLib\Contract\Service\DocumentLockManagerInterface;
 use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiTestBundle\Entity\Document as EntityDocument;
 use ChampsLibres\WopiTestBundle\Service\Repository\DocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use loophp\psr17\Psr17Interface;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\StreamInterface;
 use SimpleThings\EntityAudit\AuditReader;
 use SimpleThings\EntityAudit\Revision;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Throwable;
+
+use function array_key_exists;
+use function strlen;
 
 final class DocumentManager implements DocumentManagerInterface
 {
@@ -33,6 +38,8 @@ final class DocumentManager implements DocumentManagerInterface
 
     private EntityManagerInterface $entityManager;
 
+    private Psr17Interface $psr17;
+
     private RequestInterface $request;
 
     public function __construct(
@@ -41,16 +48,18 @@ final class DocumentManager implements DocumentManagerInterface
         DocumentRepository $documentRepository,
         EntityManagerInterface $entityManager,
         HttpMessageFactoryInterface $httpMessageFactory,
-        RequestStack $requestStack
+        RequestStack $requestStack,
+        Psr17Interface $psr17
     ) {
         $this->auditReader = $auditReader;
         $this->documentLockManager = $documentLockManager;
         $this->documentRepository = $documentRepository;
         $this->entityManager = $entityManager;
         $this->request = $httpMessageFactory->createRequest($requestStack->getCurrentRequest());
+        $this->psr17 = $psr17;
     }
 
-    public function create(array $data): Document
+    public function create(array $data): WopiDocument
     {
         $document = (new ObjectNormalizer())->denormalize([], EntityDocument::class);
 
@@ -62,12 +71,15 @@ final class DocumentManager implements DocumentManagerInterface
         return $document;
     }
 
-    public function deleteLock(Document $document): void
+    /**
+     * @param EntityDocument $document
+     */
+    public function deleteLock(WopiDocument $document): void
     {
         $this->documentLockManager->deleteLock($document, $this->request);
     }
 
-    public function findByDocumentFilename(string $documentFilename): ?Document
+    public function findByDocumentFilename(string $documentFilename): ?WopiDocument
     {
         $pathInfo = pathinfo($documentFilename);
 
@@ -79,39 +91,95 @@ final class DocumentManager implements DocumentManagerInterface
             ]);
     }
 
-    public function findByDocumentId(string $documentId): ?Document
+    public function findByDocumentId(string $documentId): ?WopiDocument
     {
         return $this->documentRepository->findOneBy(['uuid' => $documentId]);
     }
 
-    public function getLock(Document $document): string
+    /**
+     * @param EntityDocument $document
+     */
+    public function getBasename(WopiDocument $document): string
+    {
+        return $document->getBasename();
+    }
+
+    /**
+     * @param EntityDocument $document
+     */
+    public function getDocumentId(WopiDocument $document): string
+    {
+        return $document->getWopiDocId();
+    }
+
+    public function getLock(WopiDocument $document): string
     {
         return $this->documentLockManager->getLock($document, $this->request);
     }
 
-    public function getVersion(Document $document): string
+    /**
+     * @param EntityDocument $document
+     */
+    public function getSha256(WopiDocument $document): string
     {
-        return (string) $this->findLatestRevisionFromFileId((string) $document->getWopiFileId())->getRev();
+        return base64_encode(hash('sha256', (string) $document->getContent()));
     }
 
-    public function hasLock(Document $document): bool
+    /**
+     * @param EntityDocument $document
+     */
+    public function getSize(WopiDocument $document): int
+    {
+        return (null === $content = $document->getContent()) ? 0 : strlen(stream_get_contents($content));
+    }
+
+    /**
+     * @param EntityDocument $document
+     */
+    public function getVersion(WopiDocument $document): string
+    {
+        return (string) $this->findLatestRevisionFromFileId((string) $this->getDocumentId($document))->getRev();
+    }
+
+    public function hasLock(WopiDocument $document): bool
     {
         return $this->documentLockManager->hasLock($document, $this->request);
     }
 
-    public function lock(Document $document, string $lockId): void
+    public function lock(WopiDocument $document, string $lockId): void
     {
         $this->documentLockManager->setLock($document, $lockId, $this->request);
     }
 
-    public function remove(Document $document): void
+    /**
+     * @param EntityDocument $document
+     */
+    public function read(WopiDocument $document): StreamInterface
+    {
+        return (null === $contentResource = $document->getContent()) ?
+            $this->psr17->createStream('') :
+            $this->psr17->createStreamFromResource($contentResource);
+    }
+
+    public function remove(WopiDocument $document): void
     {
         $this->entityManager->remove($document);
         $this->entityManager->flush($document);
     }
 
-    public function write(Document $document): void
+    /**
+     * @param EntityDocument $document
+     */
+    public function write(WopiDocument $document, array $properties = []): void
     {
+        if (array_key_exists('content', $properties)) {
+            $document->setContent($properties['content']);
+        }
+
+        if (array_key_exists('filename', $properties)) {
+            $document->setFilename($properties['filename']);
+        }
+
         $this->entityManager->persist($document);
         $this->entityManager->flush($document);
     }
@@ -119,7 +187,16 @@ final class DocumentManager implements DocumentManagerInterface
     private function findLatestRevisionFromFileId(string $fileId): ?Revision
     {
         try {
-            $revision = $this->auditReader->findRevision($this->auditReader->getCurrentRevision(EntityDocument::class, $this->documentRepository->findOneBy(['uuid' => $fileId])->getId()));
+            $revision = $this
+                ->auditReader
+                ->findRevision(
+                    $this
+                        ->auditReader
+                        ->getCurrentRevision(
+                            EntityDocument::class,
+                            $this->documentRepository->findOneBy(['uuid' => $fileId])->getId()
+                        )
+                );
         } catch (Throwable $e) {
             return null;
         }

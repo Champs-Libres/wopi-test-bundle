@@ -13,6 +13,7 @@ use ChampsLibres\WopiLib\Contract\Service\DocumentManagerInterface;
 use ChampsLibres\WopiLib\Contract\Service\WopiInterface;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DashboardController;
 use ChampsLibres\WopiTestBundle\Controller\Admin\DocumentCrudController;
+use ChampsLibres\WopiTestBundle\Entity\Document;
 use ChampsLibres\WopiTestBundle\Entity\Share;
 use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 use loophp\psr17\Psr17Interface;
@@ -58,6 +59,7 @@ final class Wopi implements WopiInterface
     ): ResponseInterface {
         $response = $this->wopi->checkFileInfo($fileId, $accessToken, $request);
 
+        /** @var Document $document */
         $document = $this->documentManager->findByDocumentId($fileId);
         $revision = $this->auditReader->findRevision($this->documentManager->getVersion($document));
 
@@ -80,9 +82,21 @@ final class Wopi implements WopiInterface
                             [
                                 'Version' => sprintf('v%s', $revision->getRev()),
                                 'LastModifiedTime' => $revision->getTimestamp()->format('Y-m-d\TH:i:s.uP'),
-                                'DownloadUrl' => $this->router->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
-                                'FileSharingUrl' => $this->router->generate('share', ['uuid' => $document->getShare()->last()->getUuid()], RouterInterface::ABSOLUTE_URL),
-                                'SHA256' => $document->getSha256(),
+                                'DownloadUrl' => $this
+                                    ->router
+                                    ->generate(
+                                        'share',
+                                        ['uuid' => $document->getShare()->last()->getUuid()],
+                                        RouterInterface::ABSOLUTE_URL
+                                    ),
+                                'FileSharingUrl' => $this
+                                    ->router
+                                    ->generate(
+                                        'share',
+                                        ['uuid' => $document->getShare()->last()->getUuid()],
+                                        RouterInterface::ABSOLUTE_URL
+                                    ),
+                                'SHA256' => $this->documentManager->getSha256($document),
                             ]
                         )
                     )
@@ -122,7 +136,13 @@ final class Wopi implements WopiInterface
         if (null !== $share = $document->getShare()->current()) {
             /** @var Share $share */
             $properties = [
-                'ShareUrl' => $this->routerInterface->generate('share', ['uuid' => $share->getUuid()], RouterInterface::ABSOLUTE_URL),
+                'ShareUrl' => $this
+                    ->router
+                    ->generate(
+                        'share',
+                        ['uuid' => $share->getUuid()],
+                        RouterInterface::ABSOLUTE_URL
+                    ),
             ];
 
             return $this
@@ -156,9 +176,26 @@ final class Wopi implements WopiInterface
         return $this->wopi->putFile($fileId, $accessToken, $xWopiLock, $xWopiEditors, $request);
     }
 
-    public function putRelativeFile(string $fileId, string $accessToken, ?string $suggestedTarget, ?string $relativeTarget, bool $overwriteRelativeTarget, int $size, RequestInterface $request): ResponseInterface
-    {
-        $response = $this->wopi->putRelativeFile($fileId, $accessToken, $suggestedTarget, $relativeTarget, $overwriteRelativeTarget, $size, $request);
+    public function putRelativeFile(
+        string $fileId,
+        string $accessToken,
+        ?string $suggestedTarget,
+        ?string $relativeTarget,
+        bool $overwriteRelativeTarget,
+        int $size,
+        RequestInterface $request
+    ): ResponseInterface {
+        $response = $this
+            ->wopi
+            ->putRelativeFile(
+                $fileId,
+                $accessToken,
+                $suggestedTarget,
+                $relativeTarget,
+                $overwriteRelativeTarget,
+                $size,
+                $request
+            );
 
         if (200 !== $response->getStatusCode()) {
             return $response;
