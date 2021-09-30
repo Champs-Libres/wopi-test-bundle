@@ -148,8 +148,8 @@ final class DocumentCrudController extends AbstractCrudController
         $extension = $document->getExtension();
         $configuration = $this->configuration->jsonSerialize();
 
-        if ([] === $discoverExtension = $this->discovery->discoverExtension($extension)) {
-            throw new Exception('Unsupported extension.');
+        if (null === $action = $this->discovery->discoverAction($extension, 'edit')) {
+            throw new Exception('Unsupported action for this extension.');
         }
 
         $configuration['access_token'] = $this
@@ -158,9 +158,10 @@ final class DocumentCrudController extends AbstractCrudController
                 $this->security->getUser(),
                 ['fileUuid' => $document->getUuid()]
             );
+
         $configuration['server'] = $this
             ->psr17
-            ->createUri($discoverExtension[0]['urlsrc'])
+            ->createUri($action['urlsrc'])
             ->withQuery(
                 http_build_query(
                     [
