@@ -49,10 +49,12 @@ return static function (ContainerConfigurator $container) {
         ->decorate(ConfigurationInterface::class)
         ->arg('$properties', service('.inner'));
 
-    $services
-        ->set(RelaxProofValidator::class)
-        ->decorate(ProofValidatorInterface::class)
-        ->args([service('.inner')]);
+    if ($container->env() === 'dev') {
+        $services
+            ->set(RelaxProofValidator::class)
+            ->decorate(ProofValidatorInterface::class)
+            ->args([service('.inner')]);
+    }
 
     $services
         ->set(Wopi::class)
