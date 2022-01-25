@@ -13,6 +13,7 @@ use ChampsLibres\WopiLib\Contract\Entity\Document as WopiDocument;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
+
 use function strlen;
 
 /**

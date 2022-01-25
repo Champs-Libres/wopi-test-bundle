@@ -24,7 +24,7 @@ final class FakeUserProvider implements UserProviderInterface
         $this->userPasswordHasher = $userPasswordHasher;
     }
 
-    public function loadUserByIdentifier($identifier)
+    public function loadUserByIdentifier(string $identifier): UserInterface
     {
         if (stripos($identifier, 'invalid') !== false) {
             throw new UserNotFoundException('User %s not found.');
