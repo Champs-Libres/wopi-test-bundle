@@ -48,7 +48,7 @@ final class ConfigurableWopiConfiguration implements ConfigurationInterface
         );
     }
 
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return array_key_exists($offset, $this->jsonSerialize());
     }
@@ -58,7 +58,7 @@ final class ConfigurableWopiConfiguration implements ConfigurationInterface
         return $this->jsonSerialize()[$offset];
     }
 
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         $configuration = $this->jsonSerialize();
         $configuration[$offset] = $value;
@@ -70,7 +70,7 @@ final class ConfigurableWopiConfiguration implements ConfigurationInterface
         }
     }
 
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         $configuration = $this->jsonSerialize();
         unset($configuration[$offset]);
