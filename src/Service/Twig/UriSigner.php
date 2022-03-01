@@ -22,7 +22,7 @@ final class UriSigner extends AbstractExtension
         $this->uriSigner = $uriSigner;
     }
 
-    public function getFunctions()
+    public function getFunctions(): array
     {
         return [
             new TwigFunction('sign_url', [$this, 'signUrl'], ['is_safe' => ['html']]),

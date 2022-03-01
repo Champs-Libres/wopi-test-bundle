@@ -66,7 +66,7 @@ final class WopiAdminLoginFormAuthenticator extends AbstractAuthenticator implem
         return null;
     }
 
-    public function start(Request $request, ?AuthenticationException $authException = null)
+    public function start(Request $request, ?AuthenticationException $authException = null): Response
     {
         return new RedirectResponse('/login');
     }

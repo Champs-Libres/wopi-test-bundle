@@ -28,7 +28,9 @@ final class WopiDocumentRevisionTimestampFieldConfigurator implements FieldConfi
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
         $field
-            ->setFormattedValue($this->documentManager->getLastModifiedDate($entityDto->getInstance())->format('Y/m/d H:i:s'));
+            ->setFormattedValue(
+                $this->documentManager->getLastModifiedDate($entityDto->getInstance())->format('Y/m/d H:i:s')
+            );
     }
 
     public function supports(FieldDto $field, EntityDto $entityDto): bool

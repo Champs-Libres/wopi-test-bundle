@@ -53,7 +53,7 @@ final class ConfigurableWopiConfiguration implements ConfigurationInterface
         return array_key_exists($offset, $this->jsonSerialize());
     }
 
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         return $this->jsonSerialize()[$offset];
     }

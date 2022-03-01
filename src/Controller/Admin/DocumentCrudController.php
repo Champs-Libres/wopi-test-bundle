@@ -39,6 +39,7 @@ use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTManager;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use loophp\psr17\Psr17Interface;
 use SimpleThings\EntityAudit\AuditReader;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Security\Core\Security;
@@ -133,7 +134,7 @@ final class DocumentCrudController extends AbstractCrudController
             ->setSortable(false);
     }
 
-    public function edit(AdminContext $context)
+    public function edit(AdminContext $context): KeyValueStore|Response
     {
         $documentId = $context->getEntity()->getInstance()->getId();
         $documentRevision = $context->getRequest()->query->get('revision');
